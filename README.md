@@ -183,7 +183,7 @@ SOFABoot Version: 3.11.1 (v3.11.1)
 Powered By Ant Group
 
 2024-05-12 03:12:22.840  INFO 31384 --- [main] : SOFABoot Runtime Starting!
-2024-05-12 03:12:22.849  INFO 31384 --- [ main] : Starting SofabootQuickstartApplication on LAPTOP-0UIAERQR with PID 99999 (C:\xxx\xxx\sofaboot-quickstart\target\classes started by root in C:\xxx\xxx\sofaboot-quickstart)
+2024-05-12 03:12:22.849  INFO 31384 --- [main] : Starting SofabootQuickstartApplication on LAPTOP-0UIAERQR with PID 99999 (C:\xxx\xxx\sofaboot-quickstart\target\classes started by root in C:\xxx\xxx\sofaboot-quickstart)
 2024-05-12 03:12:22.850  INFO 31384 --- [main] : No active profile set, falling back to default profiles: default
 2024-05-12 03:12:23.934  INFO 31384 --- [main] : Tomcat initialized with port(s): 8080 (http)
 2024-05-12 03:12:23.944  INFO 31384 --- [main] : Starting service [Tomcat]
@@ -615,12 +615,24 @@ public class JvmServiceConsumer implements ClientFactoryAware {
 JvmServiceConsumer 实现 ClientFactoryAware 接口，并在其 init 方法中引用 JVM 服务:
 
 ```java
+package com.sofaboot.quickstart.consumer;
+
+import com.alipay.sofa.runtime.api.aware.ClientFactoryAware;
+import com.alipay.sofa.runtime.api.client.ClientFactory;
+import com.alipay.sofa.runtime.api.client.ReferenceClient;
+import com.alipay.sofa.runtime.api.client.param.ReferenceParam;
+import com.sofaboot.quickstart.facade.SampleJvmService;
+
+/**
+ * @author: ljt
+ * @version: $Id: JvmServiceConsumer.java, v 0.1 2024/05/12, ljt Exp $
+ */
 public class JvmServiceConsumer implements ClientFactoryAware {
-    private ClientFactory    clientFactory;
+    private ClientFactory clientFactory;
 
     public void init() {
         ReferenceClient referenceClient = clientFactory.getClient(ReferenceClient.class);
-        ReferenceParam<SampleJvmService> referenceParam = new ReferenceParam<>();
+        ReferenceParam<SampleJvmService> referenceParam = new ReferenceParam<SampleJvmService>();
         referenceParam.setInterfaceType(SampleJvmService.class);
         referenceParam.setUniqueId("serviceClientImpl");
         SampleJvmService sampleJvmServiceClientImpl = referenceClient.reference(referenceParam);
