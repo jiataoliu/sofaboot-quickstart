@@ -1,9 +1,13 @@
+# 参考文档
+
+https://www.sofastack.tech/projects/sofa-boot/quick-start/
+
+
+https://help.aliyun.com/document_detail/133243.html
+
+
+
 # 快速开始
-
-参考：https://www.sofastack.tech/projects/sofa-boot/quick-start/
-
-
-参考：https://help.aliyun.com/document_detail/133243.html
 
 
 SOFABoot 版本和 Spring Boot 版本对应关系如下：
@@ -54,7 +58,7 @@ SOFABoot 版本和 Spring Boot 版本对应关系如下：
 
 
 
-# 创建工程
+## 创建工程
 
 创建好一个 Spring Boot 的工程
 
@@ -111,7 +115,7 @@ SOFABoot 版本和 Spring Boot 版本对应关系如下：
 
 
 
-# 依赖管理
+## 依赖管理
 
 引入 SOFABoot 的依赖
 
@@ -166,7 +170,7 @@ management.endpoint.health.show-details=always
 
 
 
-# 启动应用
+## 启动应用
 
 可以将工程导入到 IDE 中运行生成的工程里面中的 `main` 方法（一般上在 XXXApplication 这个类中）启动应用，也可以直接在该工程的根目录下运行 `mvn spring-boot:run`，将会在控制台中看到启动打印的日志：
 
@@ -197,7 +201,7 @@ Powered By Ant Group
 
 
 
-# 健康检查
+## 版本查看
 
 可以通过在浏览器中输入 http://localhost:8080/actuator/versions 来查看当前 SOFABoot 中使用 Maven 插件生成的版本信息汇总，结果类似如下：
 
@@ -218,6 +222,8 @@ Powered By Ant Group
 ```
 
 
+
+## 健康检查
 
 可以通过在浏览器中输入 http://localhost:8080/actuator/readiness 查看应用 Readiness Check 的状况，类似如下：
 
@@ -272,7 +278,46 @@ Powered By Ant Group
 
 
 
-# 查看日志
+## 扩展 Readiness Check 能力
+
+在 Readiness Check 的各个阶段，SOFABoot 都提供了扩展的能力，应用可以根据自己的需要进行扩展，在 2.x 版本中，可供扩展的点如下：
+
+| 回调接口                                                     | 说明                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| org.springframework.context.ApplicationListener              | 如果想要在 Readiness Check 之前做一些事情，那么监听这个 Listener 的 SofaBootBeforeHealthCheckEvent 事件。 |
+| org.springframework.boot.actuate.health.HealthIndicator      | 如果想要在 SOFABoot 的 Readiness Check 里面增加一个检查项，那么可以直接扩展 Spring Boot 的这个接口。 |
+| com.alipay.sofa.healthcheck.startup.SofaBootAfterReadinessCheckCallback | 如果想要在 Readiness Check 之后做一些事情，那么可以扩展 SOFABoot 的这个接口。 |
+
+在 3.x 版本中，可供扩展点如下：
+
+| 回调接口                                                     | 说明                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| com.alipay.sofa.healthcheck.core.HealthChecker               | 如果想要在 SOFABoot 的 Readiness Check 里面增加一个检查项，可以直接扩展该接口。相较于 Spring Boot 本身的 HealthIndicator 接口，该接口提供了一些额外的参数配置，比如检查失败重试次数等。 |
+| org.springframework.boot.actuate.health.HealthIndicator      | 如果想要在 SOFABoot 的 Readiness Check 里面增加一个检查项，那么可以直接扩展 Spring Boot 的这个接口。 |
+| org.springframework.boot.actuate.health.ReactiveHealthIndicator | 在 WebFlux 中，如果想要在 SOFABoot 的 Readiness Check 里面增加一个检查项，那么可以直接扩展 Spring Boot 的这个接口。 |
+| com.alipay.sofa.healthcheck.startup.ReadinessCheckCallback   | 如果想要在 Readiness Check 之后做一些事情，那么可以扩展 SOFABoot 的这个接口。 |
+
+需要指出的是，上述四个扩展接口均可以通过 Spring Boot 标准的 `Ordered`, `PriorityOrdered` 和注解 `@Order` 实现执行顺序的设置。
+
+
+
+## Readiness Check 配置项
+
+应用在引入 SOFABoot 的健康检查扩展之后，可以在 Spring Boot 的配置文件 `application.properties` 中添加相关配置项来定制 Readiness Check 的相关行为。
+
+| Readiness Check 配置项                                     | 说明                                        | 默认值          | 开始支持版本                  |
+| ---------------------------------------------------------- | ------------------------------------------- | --------------- | ----------------------------- |
+| com.alipay.sofa.healthcheck.skip.all                       | 是否跳过整个 Readiness Check 阶段           | false           | 2.4.0                         |
+| com.alipay.sofa.healthcheck.skip.component                 | 是否跳过 SOFA 中间件的 Readiness Check      | false           | 2.4.0                         |
+| com.alipay.sofa.healthcheck.skip.indicator                 | 是否跳过 HealthIndicator 的 Readiness Check | false           | 2.4.0                         |
+| com.alipay.sofa.healthcheck.component.check.retry.count    | 组件健康检查重试次数                        | 20              | 2.4.10 (之前版本重试次数为 0) |
+| com.alipay.sofa.healthcheck.component.check.retry.interval | 组件健康检查重试间隔时间                    | 1000 (单位：ms) | 2.4.10 (之前版本重试间隔为 0) |
+| com.alipay.sofa.healthcheck.module.check.retry.count       | sofaboot 模块健康检查重试次数               | 0               | 2.4.10                        |
+| com.alipay.sofa.healthcheck.module.check.retry.interval    | sofaboot 模块健康检查重试间隔时间           | 1000 (单位：ms) | 2.4.10 (之前版本重试间隔为 0) |
+
+
+
+## 查看日志
 
 在上面的 `application.properties` 里面，我们配置的日志打印目录是 `./logs` 即当前应用的根目录（我们可以根据自己的实践需要配置），在当前工程的根目录下可以看到类似如下结构的日志文件：
 
@@ -288,6 +333,65 @@ Powered By Ant Group
 ```
 
 如果应用启动失败或者健康检查返回失败，可以通过相应的日志文件找到错误的原因，有些需要关注 `common-error.log` 日志。
+
+
+
+# 启动加速
+
+SOFABoot 提供了模块并行加载以及 Spring Bean 异步初始化能力，用于加快应用启动速度。下面介绍如何使用 SOFABoot 异步初始化 Spring Bean 能力来提高应用启动速度。
+
+
+
+## 使用场景
+
+在实际使用 Spring/Spring Boot 开发中，一些 Bean 在初始化过程中执行准备操作，如拉取远程配置、初始化数据源等等。在应用启动期间，这些 Bean 会增加 Spring 上下文刷新时间，导致应用启动耗时变长。
+
+为了加速应用启动，SOFABoot 通过配置可选项，将 Bean 的初始化方法（init-method）使用单独线程异步执行，加快 Spring 上下文加载过程，提高应用启动速度。
+
+
+
+## 引入依赖
+
+SOFABoot 在 v2.6.0 开始提供异步初始化 Spring Bean 能力，引入如下 Starter 即可：
+
+```xml
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>runtime-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+
+
+## 使用方法
+
+异步初始化 Bean 的原理是开启单独线程负责执行 Bean 的初始化方法(init-method)，因此在使用过程中，除了引入上述依赖管理，还需要在 Bean 的 xml 定义中配置 `sofa:async-init="true"` 属性，用于指定是否异步执行该 Bean 的初始化方法，例如：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:sofa="http://sofastack.io/schema/sofaboot"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                   http://sofastack.io/schema/sofaboot   http://sofastack.io/schema/sofaboot.xsd"
+       default-autowire="byName">
+
+    <!-- async init test -->
+    <bean id="testBean" class="com.alipay.sofa.runtime.beans.TimeWasteBea" init-method="init" sofa:async-init="true"/>
+</beans>
+```
+
+
+
+## 属性配置
+
+SOFABoot 异步初始化能力提供两个属性配置，用于指定负责异步执行 Bean 初始化方法（init-method）的线程池大小：
+
+- `com.alipay.sofa.boot.asyncInitBeanCoreSize`：线程池基本大小，默认值为 CPU 核数加一。
+- `com.alipay.sofa.boot.asyncInitBeanMaxSize`：线程池中允许的最大线程数大小，默认值为 CPU 核数加一。
+
+此配置可以通过 VM -D 参数或者 Spring Boot 配置文件 application.yml 设置。
 
 
 
@@ -762,6 +866,8 @@ Hello, jvm service annotation implementation.
 Hello, jvm service service client implementation.
 ```
 
+
+
 ## 编写测试用例
 
 SOFABoot 模块化测试方法与 Spring Boot 测试方法一致，只需在测试用例上增加 @SpringBootTest 注解及 @RunWith(SpringRunner.class) 注解即可。在测试用例中，还可以使用 @SofaReference 注解，对 SOFABoot 模块发布的服务进行测试：
@@ -800,5 +906,85 @@ public class ModuleControllerTests {
 
 
 
+# 依赖管理
+
+SOFABoot 是在 Spring Boot 的基础上提供的功能扩展。基于 Spring Boot 的机制，SOFABoot 管理了 SOFA 中间件的依赖，并且提供了 Spring Boot 的 Starter，方便用户在 Spring Boot 中使用 SOFA 中间件。
 
 
+
+## SOFABoot 依赖管理 – Maven
+
+在使用 SOFA 中间件之前，需要引入 SOFABoot 依赖管理。类似 Spring Boot 引入方式，在工程中增加如下 `<parent/>` 标签配置的方式:
+
+```xml
+<parent>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>sofaboot-dependencies</artifactId>
+    <version>${sofa.boot.version}</version>
+</parent>
+```
+
+其中 `${sofa.boot.version}` 为具体的 SOFABoot 版本，参考 [sofa-boot 发布历史](https://github.com/sofastack/sofa-boot/releases)。
+
+
+
+## 引入 SOFA 中间件
+
+SOFABoot 使用一系列后缀为 `-sofa-boot-starter` 来标示一个中间件组件，如果想要使用某个中间件，直接添加对应的依赖即可。例如，如果期望使用 SOFARPC，只需增加下面的 Maven 依赖即可：
+
+```xml
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>rpc-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+注意上面的 Maven 依赖中并没有声明版本，这个是因为版本已经在 `sofaboot-dependencies` 里面声明好。这样做的好处是对于 SOFA 中间件，用户统一进行升级即可，不需要单独升级一个中间件的版本，防止出现依赖冲突以及兼容性的问题。目前管控的 SOFABoot 中间件列表如下:
+
+| 中间件      | starter                   |
+| ----------- | ------------------------- |
+| SOFARPC     | rpc-sofa-boot-starter     |
+| SOFATracer  | tracer-sofa-boot-starter  |
+| SOFALookout | lookout-sofa-boot-starter |
+
+
+
+## 引入 SOFABoot 扩展组件
+
+SOFABoot 基于 Spring Boot 提供了健康检查，模块隔离，类隔离等扩展能力。遵循 Spring Boot 依赖即服务的理念，添加相关组件依赖之后，扩展能力即可生效。目前提供的扩展组件如下：
+
+| 扩展组件   | starter                     |
+| ---------- | --------------------------- |
+| 健康检查   | actuator-sofa-boot-starter  |
+| 模块化隔离 | isle-sofa-boot-starter      |
+| 类隔离     | sofa-ark-springboot-starter |
+| 测试扩展   | test-sofa-boot-starter      |
+
+
+
+## 引入 SOFA 中间件 ark 插件
+
+SOFABoot 提供了类隔离组件 [SOFAArk](https://www.sofastack.tech/projects/sofa-boot/sofa-ark-readme)，借助 SOFAArk 容器，用户可以将依赖冲突的三方包打包成 ark 插件。运行时，ark 插件使用单独的类加载器加载，可以和其他 ark 插件以及业务依赖隔离，解决类冲突问题。SOFABoot 官方提供了 SOFARPC 和 SOFATracer 的 ark 插件，例如在应用中引入 SOFARPC ark 插件依赖替代 SOFARPC starter，从而隔离应用和 SOFARPC 及其间接依赖。目前管控的 ark 插件列表如下:
+
+| Ark插件    | plugin                  |
+| ---------- | ----------------------- |
+| SOFARPC    | rpc-sofa-boot-plugin    |
+| SOFATracer | tracer-sofa-boot-plugin |
+
+
+
+## 引入 SOFABoot 命名空间
+
+使用 SOFA 中间件时，需要在 `XML` 中根据中间件的具体使用方式添加相应的配置，这个时候需要引入 SOFABoot 的命名空间 `xmlns:sofa="http://sofastack.io/schema/sofaboot"` 以能够正确解析相应的配置标签，示例：
+
+```xml
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:sofa="http://sofastack.io/schema/sofaboot"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+            http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+            http://sofastack.io/schema/sofaboot   http://sofastack.io/schema/sofaboot.xsd"
+       default-autowire="byName">
+</beans>
+```
