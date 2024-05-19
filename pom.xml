@@ -22,5 +22,6 @@
     <modules>
         <module>sofaboot-quickstart-sample</module>
         <module>sofaboot-quickstart-module</module>
+        <module>sofaboot-quickstart-tracer-mvc</module>
     </modules>
 </project>

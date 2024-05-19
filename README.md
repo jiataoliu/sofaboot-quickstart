@@ -1,9 +1,14 @@
 # 参考文档
 
-https://www.sofastack.tech/projects/sofa-boot/quick-start/
+https://www.sofastack.tech/projects/sofa-boot/quick-start/《SOFABoot 快速开始》
 
+https://help.aliyun.com/document_detail/133243.html《SOFABoot 快速入门》
 
-https://help.aliyun.com/document_detail/133243.html
+https://www.sofastack.tech/projects/sofa-tracer/usage-of-mvc/《SOFATracer 日志 Spring MVC 埋点接入》
+
+https://help.aliyun.com/document_detail/151860.html《SOFATracer 日志说明》
+
+https://help.aliyun.com/document_detail/151854.html《SOFATracer 日志采样模式》
 
 
 
@@ -73,7 +78,7 @@ SOFABoot 版本和 Spring Boot 版本对应关系如下：
         <version>2.3.12.RELEASE</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.sofaboot.quickstart</groupId>
     <artifactId>sofaboot-quickstart-sample</artifactId>
@@ -988,3 +993,318 @@ SOFABoot 提供了类隔离组件 [SOFAArk](https://www.sofastack.tech/projects/
        default-autowire="byName">
 </beans>
 ```
+
+
+
+# SOFATracer
+
+## 什么是 SOFATracer
+
+SOFATracer 是蚂蚁金服基于 OpenTracing 规范开发的分布式链路跟踪系统，其核心理念就是通过一个全局的 TraceId 将分布在各个服务节点上的同一次请求串联起来。通过统一的 TraceId 将调用链路中的各种网络调用情况以日志的方式记录下来，同时也提供远程汇报到 Zipkin 进行展示的能力，以此达到透视化网络调用的目的。
+
+
+
+### 功能描述
+
+**基于 OpenTracing 规范提供分布式链路跟踪解决方案**
+
+基于 [OpenTracing 规范](http://opentracing.io/documentation/pages/spec.html) 并扩展其能力提供链路跟踪的解决方案。各个框架或者组件可以基于此实现，通过在各个组件中埋点的方式来提供链路跟踪的能力。
+
+
+
+**提供异步落地磁盘的日志打印能力**
+
+基于 [Disruptor](https://github.com/LMAX-Exchange/disruptor) 高性能无锁循环队列，提供异步打印日志到本地磁盘的能力。框架或者组件能够在接入时，在异步日志打印的前提下可以自定义日志文件的输出格式。SOFATracer 提供两种类似的日志打印类型即摘要日志和统计日志：
+
+- 摘要日志：每一次调用均会落地磁盘的日志。
+- 统计日志：每隔一定时间间隔进行统计输出的日志。
+
+
+
+**支持日志自清除和滚动能力**
+
+异步落地磁盘的 SOFATracer 日志支持自清除和滚动能力，支持按照天清除和按照小时或者天滚动的能力。
+
+
+
+**基于 SLF4J MDC 的扩展能力**
+
+SLF4J 提供了 MDC（Mapped Diagnostic Contexts）功能，可以支持用户定义和修改日志的输出格式以及内容。SOFATracer 集成了 SLF4J MDC 功能，方便用户在只简单修改日志配置文件即可输出当前 Tracer 上下文的 TraceId 和 SpanId。
+
+
+
+**界面展示能力**
+
+SOFATracer 可以将链路跟踪数据远程上报到开源产品 [Zipkin](https://zipkin.io/) 做分布式链路跟踪的展示。
+
+
+
+**统一配置能力**
+
+配置文件中提供丰富的配置能力以定制化应用的个性需求。
+
+
+
+### 应用场景
+
+解决在实施大规模微服务架构时的链路跟踪问题，达到透视化网络调用的目的，并可用于故障的快速发现、服务治理等。
+
+
+
+### 组件埋点
+
+目前 SOFATracer 支持 Spring MVC、标准 JDBC 接口实现的数据库连接池（DBCP、Druid、c3p0、tomcat、HikariCP、BoneCP）、HttpClient、Dubbo、Spring Cloud OpenFeign 等开源组件，其他开源组件（如 MQ、Redis）埋点支持在开发中。
+
+
+
+## TraceId 和 SpanId 生成规则
+
+SOFATracer 通过 TraceId 来将一个请求在各个服务器上的调用日志串联起来，TraceId 一般由接收请求经过的第一个服务器产生。
+
+
+
+### TraceId 生成规则
+
+SOFATracer 通过 TraceId 来将一个请求在各个服务器上的调用日志串联起来，TraceId 一般由接收请求经过的第一个服务器产生。
+
+产生规则是： 服务器 IP + ID 产生的时间 + 自增序列 + 当前进程号 ，比如：
+
+```dns
+0ad1348f1403169275002100356696
+```
+
+前 8 位 `0ad1348f` 即产生 TraceId 的机器的 IP，这是一个十六进制的数字，每两位代表 IP 中的一段，我们把这个数字，按每两位转成 10 进制即可得到常见的 IP 地址表示方式 `10.209.52.143`，您也可以根据这个规律来查找到请求经过的第一个服务器。
+
+后面的 13 位 `1403169275002` 是产生 TraceId 的时间。之后的 4 位 `1003` 是一个自增的序列，从 1000 涨到 9000，到达 9000 后回到 1000 再开始往上涨。最后的 5 位 `56696` 是当前的进程 ID，为了防止单机多进程出现 TraceId 冲突的情况，所以在 TraceId 末尾添加了当前的进程 ID。
+
+**说明**：TraceId 目前的生成的规则参考了阿里的鹰眼组件。
+
+
+
+### SpanId 生成规则
+
+SOFATracer 中的 SpanId 代表本次调用在整个调用链路树中的位置。
+
+假设一个 Web 系统 A 接收了一次用户请求，那么在这个系统的 SOFATracer MVC 日志中，记录下的 SpanId 是 0，代表是整个调用的根节点，如果 A 系统处理这次请求，需要通过 RPC 依次调用 B、C、D 三个系统，那么在 A 系统的 SOFATracer RPC 客户端日志中，SpanId 分别是 0.1，0.2 和 0.3，在 B、C、D 三个系统的 SOFATracer RPC 服务端日志中，SpanId 也分别是 0.1，0.2 和 0.3；如果 C 系统在处理请求的时候又调用了 E，F 两个系统，那么 C 系统中对应的 SOFATracer RPC 客户端日志是 0.2.1 和 0.2.2，E、F 两个系统对应的 SOFATracer RPC 服务端日志也是 0.2.1 和 0.2.2。
+
+根据上面的描述可以知道，如果把一次调用中所有的 SpanId 收集起来，可以组成一棵完整的链路树。
+
+假设一次分布式调用中产生的 TraceId 是 `0a1234`（实际不会这么短），那么根据上文 SpanId 的产生过程。
+
+
+
+## Spring MVC 埋点接入
+
+```xml
+<parent>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>sofaboot-dependencies</artifactId>
+    <version>3.11.1</version>
+    <relativePath/>
+</parent>
+<modelVersion>4.0.0</modelVersion>
+
+<groupId>com.sofaboot.quickstart</groupId>
+<artifactId>sofaboot-quickstart-tracer-mvc</artifactId>
+<version>0.0.1-SNAPSHOT</version>
+
+<name>sofaboot-quickstart-tracer-mvc</name>
+<description>sofaboot-quickstart-tracer-mvc</description>
+```
+
+
+
+### 引入 Tracer 依赖
+
+在 SOFABoot 的 Web 项目中引入如下 Tracer 依赖：
+
+```xml
+<!-- import SOFABoot Dependency Tracer starter -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>tracer-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+添加 Tracer starter 依赖后，可在 SOFABoot 的全局配置文件中添加配置项目以定制 Tracer 的行为。详情见 [Tracer 配置项说明](https://help.aliyun.com/document_detail/151843.html?spm=a2c4g.280407.0.0.65896f45o7OjVg#h2-tracer-5)。
+
+
+
+### 添加 properties
+
+```properties
+# Application Name
+spring.application.name=sofaboot-quickstart-tracer-mvc
+# 日志输出目录，默认输出到 ${user.home}
+logging.path=./logs
+```
+
+
+
+### 添加 Controller
+
+如果您的 Web 工程中没有基于 Spring MVC 框架构建的 Controller，那么可以按照如下方式添加一个 Controller；如果已经有 Controller，那么可直接访问相应的服务。
+
+```java
+package com.sofaboot.quickstart.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author: ljt
+ * @version: $Id: TracerMvcRestController.java, v 0.1 2024/05/15, ljt Exp $
+ */
+@RestController
+public class TracerMvcRestController {
+
+    /**
+     * 日志记录器对象
+     */
+    private static final Logger logger = LoggerFactory.getLogger(TracerMvcRestController.class);
+
+    private static final String TEMPLATE = "Hello, %s!";
+    private final AtomicLong counter = new AtomicLong();
+
+    /**
+     * http://localhost:8080/greeting
+     *
+     * @param name name
+     * @return map
+     */
+    @RequestMapping("/greeting")
+    public Map<String, Object> greeting(@RequestParam(value = "name", defaultValue = "SOFATracer SpringMVC DEMO") String name) {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("id", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+        return resultMap;
+    }
+
+    /**
+     * http://localhost:8080/asyncGreeting
+     *
+     * @param name name
+     * @return map
+     */
+    @RequestMapping("/asyncGreeting")
+    public Map<String, Object> asyncGreeting(@RequestParam(value = "name", defaultValue = "SOFATracer SpringMVC DEMO") String name) throws InterruptedException {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("id", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+        Thread.sleep(2000);
+        return resultMap;
+    }
+}
+```
+
+
+
+### 运行工程
+
+可以将 SOFABoot 工程导入到 IDE 中，工程编译正确后，运行工程里面中的 main 方法启动应用。以上面添加的 Controller 为例，可以通过在浏览器中输入 http://localhost:8080/greeting 来访问 REST 服务，结果类似如下：
+
+```json
+{
+    "success": true,
+    "id": 1,
+    "content": "Hello, SOFATracer SpringMVC DEMO!"
+}
+```
+
+
+
+### 查看日志
+
+在 SOFABoot 的配置文件 `application.properties` 中可定义日志打印目录。假设配置的日志打印目录是 `./logs`，即当前应用的根目录，应用名设置为 `spring.application.name=sofaboot-quickstart-tracer-mvc`，那么在当前工程的根目录下可以看到类似如下结构的日志文件：
+
+```
+./logs
+├── spring.log
+└── tracelog
+    ├── spring-mvc-digest.log
+    ├── spring-mvc-stat.log
+    ├── static-info.log
+    └── tracer-self.log
+```
+
+
+
+#### 查看 Spring MVC 摘要日志
+
+`spring-mvc-digest.log` 是 Spring MVC 摘要日志，以 JSON 格式输出。
+
+打开 `spring-mvc-digest.log` 可看到具体的输出内容。下面是一条日志记录的日志样例如下：
+
+```json
+{"time":"2024-05-15 00:00:00.000","local.app":"sofaboot-quickstart-tracer-mvc","traceId":"c0a818011715886893986100117568","spanId":"0","span.kind":"server","result.code":"200","current.thread.name":"http-nio-8080-exec-1","time.cost.milliseconds":"40ms","request.url":"http://localhost:8080/greeting","method":"GET","req.size.bytes":-1,"resp.size.bytes":0,"error":"","sys.baggage":"","biz.baggage":""}
+```
+
+各输出字段的具体含义，详见 [日志格式 > Spring MVC 日志](https://help.aliyun.com/document_detail/151860.html)。
+
+对应 key 的说明如下：
+
+| key                    | 说明                                                         |
+| ---------------------- | ------------------------------------------------------------ |
+| time                   | 日志打印时间                                                 |
+| local.app              | 当前应用名                                                   |
+| traceId                | 请求的 TraceId。详细信息，请参见 [TraceId 生成规则](https://help.aliyun.com/document_detail/151840.html#h2-traceid-1)。 |
+| spanId                 | 请求的 SpanId。详细信息，请参见 [SpanId 生成规则](https://help.aliyun.com/document_detail/151840.html#h2-spanid-2)。 |
+| span.kind              | Span 类型                                                    |
+| result.code            | 结果码                                                       |
+| current.thread.name    | 当前线程名                                                   |
+| time.cost.milliseconds | Span 耗时，单位：ms。                                        |
+| request.url            | 请求 URL                                                     |
+| method                 | 调用方法                                                     |
+| req.size.bytes         | 请求数据大小，单位：Byte。                                   |
+| resp.size.bytes        | 响应数据大小，单位：Byte。                                   |
+| sys.baggage            | 系统透传的 baggage 数据                                      |
+| biz.baggage            | 业务透传的 baggage 数据                                      |
+
+
+
+#### 查看 Spring MVC 统计日志
+
+`spring-mvc-stat.log` 是 Spring MVC 统计日志。其中，`stat.key` 为本段时间内的统计关键字集合，统计关键字集合唯一确定一组统计数据，包含 `method`、`local.app` 和 `request.url` 字段。日志样例如下：
+
+```json
+{"time":"2024-05-15 00:00:00.000","stat.key":{"method":"GET","local.app":"sofaboot-quickstart-tracer-mvc","request.url":"http://localhost:8080/greeting"},"count":1,"total.cost.milliseconds":82,"success":"Y","load.test":"F"}
+```
+
+对应 key 的说明如下：
+
+| key                     | 说明                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| time                    | 日志打印时间                                                 |
+| stat.key.method         | 调用方法                                                     |
+| stat.key.local.app      | 当前应用名                                                   |
+| stat.key.request.url    | 请求 URL                                                     |
+| count                   | 请求次数                                                     |
+| total.cost.milliseconds | 请求总耗时，单位：ms。                                       |
+| success                 | 请求结果：true：表示请求成功。1XX、2XX、301、302 表示请求成功，其他状态码表示请求失败。false：表示请求失败。 |
+| load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
+
+
+
+### Tracer 配置项说明
+
+| SOFATracer 配置项                                         | 说明                                                         | 默认值                                                       |
+| :-------------------------------------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------- |
+| `logging.path`                                            | 日志输出目录                                                 | SOFATracer 会优先输出到 `logging.path` 目录下；如果没有配置日志输出目录，那默认输出到 `${user.home}` |
+| `com.alipay.sofa.tracer.disableDigestLog`                 | 是否关闭所有集成 SOFATracer 组件摘要日志打印                 | false                                                        |
+| `com.alipay.sofa.tracer.disableConfiguration[${logType}]` | 关闭指定 `${logType}` 的 SOFATracer 组件摘要日志打印。`${logType}` 是指具体的日志类型，如：`spring-mvc-digest.log` | false                                                        |
+| `com.alipay.sofa.tracer.tracerGlobalRollingPolicy`        | SOFATracer 日志的滚动策略                                    | `.yyyy-MM-dd`：按照天滚动；`.yyyy-MM-dd_HH`：按照小时滚动。默认不配置按照天滚动。 |
+| `com.alipay.sofa.tracer.tracerGlobalLogReserveDay`        | SOFATracer 日志的保留天数                                    | 默认保留 7 天                                                |
+| `com.alipay.sofa.tracer.statLogInterval`                  | 统计日志的时间间隔，单位：秒                                 | 默认 60 秒统计日志输出一次                                   |
+| `com.alipay.sofa.tracer.baggageMaxLength`                 | 透传数据能够允许存放的最大长度                               | 默认值 1024                                                  |
+| `com.alipay.sofa.tracer.springmvc.filterOrder`            | SOFATracer 集成在 Spring MVC 的 Filter 生效的 Order          | -2147483647（org.springframework.core.Ordered#HIGHEST_PRECEDENCE + 1） |
+| `com.alipay.sofa.tracer.springmvc.urlPatterns`            | SOFATracer 集成在 SpringMVC 的 Filter 生效的 URL Pattern 路径 | /* 全部生效                                                  |
+
