@@ -1096,20 +1096,54 @@ SOFATracer 中的 SpanId 代表本次调用在整个调用链路树中的位置�
 ## Spring MVC 埋点接入
 
 ```xml
-<parent>
-    <groupId>com.alipay.sofa</groupId>
-    <artifactId>sofaboot-dependencies</artifactId>
-    <version>3.11.1</version>
-    <relativePath/>
-</parent>
-<modelVersion>4.0.0</modelVersion>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.alipay.sofa</groupId>
+        <artifactId>sofaboot-dependencies</artifactId>
+        <version>3.11.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
 
-<groupId>com.sofaboot.quickstart</groupId>
-<artifactId>sofaboot-quickstart-tracer-mvc</artifactId>
-<version>0.0.1-SNAPSHOT</version>
+    <groupId>com.sofaboot.quickstart</groupId>
+    <artifactId>sofaboot-quickstart-tracer-mvc</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
 
-<name>sofaboot-quickstart-tracer-mvc</name>
-<description>sofaboot-quickstart-tracer-mvc</description>
+    <name>sofaboot-quickstart-tracer-mvc</name>
+    <description>sofaboot-quickstart-tracer-mvc</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
 ```
 
 
@@ -1248,8 +1282,6 @@ public class TracerMvcRestController {
 {"time":"2024-05-15 00:00:00.000","local.app":"sofaboot-quickstart-tracer-mvc","traceId":"c0a818011715886893986100117568","spanId":"0","span.kind":"server","result.code":"200","current.thread.name":"http-nio-8080-exec-1","time.cost.milliseconds":"40ms","request.url":"http://localhost:8080/greeting","method":"GET","req.size.bytes":-1,"resp.size.bytes":0,"error":"","sys.baggage":"","biz.baggage":""}
 ```
 
-各输出字段的具体含义，详见 [日志格式 > Spring MVC 日志](https://help.aliyun.com/document_detail/151860.html)。
-
 对应 key 的说明如下：
 
 | key                    | 说明                                                         |
@@ -1307,4 +1339,332 @@ public class TracerMvcRestController {
 | `com.alipay.sofa.tracer.baggageMaxLength`                 | 透传数据能够允许存放的最大长度                               | 默认值 1024                                                  |
 | `com.alipay.sofa.tracer.springmvc.filterOrder`            | SOFATracer 集成在 Spring MVC 的 Filter 生效的 Order          | -2147483647（org.springframework.core.Ordered#HIGHEST_PRECEDENCE + 1） |
 | `com.alipay.sofa.tracer.springmvc.urlPatterns`            | SOFATracer 集成在 SpringMVC 的 Filter 生效的 URL Pattern 路径 | /* 全部生效                                                  |
+
+
+
+## HttpClient 埋点接入
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.alipay.sofa</groupId>
+        <artifactId>sofaboot-dependencies</artifactId>
+        <version>3.11.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sofaboot.quickstart</groupId>
+    <artifactId>sofaboot-quickstart-tracer-httpclient</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <name>sofaboot-quickstart-tracer-httpclient</name>
+    <description>sofaboot-quickstart-tracer-httpclient</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+
+
+### 引入 Tracer 依赖
+
+1. 在 SOFABoot 的 Web 项目中引入如下 Tracer 依赖：
+
+```xml
+<!-- import SOFABoot Dependency Tracer starter -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>tracer-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+添加 Tracer starter 依赖后，可在 SOFABoot 的全局配置文件中添加配置项目以定制 Tracer 的行为。详情见 [Tracer 配置项说明](https://help.aliyun.com/document_detail/151843.html?spm=a2c4g.280407.0.0.65896f45o7OjVg#h2-tracer-5)。
+
+
+
+2. 基于 SOFATracer 的 HttpClient 插件
+
+为了使得 HttpClient 这个第三方开源组件能够支持 SOFATracer 的链路调用，SOFATracer 提供了 HttpClient 的插件扩展，即 `tracer-enterprise-httpclient-plugin`：
+
+```xml
+<!-- 基于 SOFATracer 的 HttpClient 插件 -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>sofa-tracer-httpclient-plugin</artifactId>
+</dependency>
+```
+
+
+
+3. HttpClient 依赖
+
+```xml
+<!-- HttpClient 依赖 -->
+<dependency>
+    <groupId>org.apache.httpcomponents</groupId>
+    <artifactId>httpclient</artifactId>
+    <!-- 版本 4.3.x - 4.5.x -->
+    <version>4.5.3</version>
+</dependency>
+<dependency>
+    <groupId>org.apache.httpcomponents</groupId>
+    <artifactId>httpasyncclient</artifactId>
+    <!-- 版本 4.1.x -->
+    <version>4.1.3</version>
+</dependency>
+```
+
+
+
+### 添加 properties
+
+```properties
+# Application Name
+spring.application.name=sofaboot-quickstart-tracer-httpclient
+# 日志输出目录，默认输出到 ${user.home}
+logging.path=./logs
+
+# 参考文档：https://help.aliyun.com/document_detail/151854.html
+# 采样率 (0~100)%
+com.alipay.sofa.tracer.samplerPercentage=100
+# 采样模式类型名称
+#com.alipay.sofa.tracer.samplerName=PercentageBasedSampler
+
+# 统计日志的时间间隔，默认 60，这里为了方便快速看统计设置成 1
+com.alipay.sofa.tracer.statLogInterval=1
+com.alipay.sofa.tracer.zipkin.enabled=false
+
+# 是否以 JSON 格式输出日志，使用非 JSON 格式输出，期望较少日志空间占用
+#com.alipay.sofa.tracer.JSONOutput=false
+```
+
+
+
+### 构造 HttpClient 并发起对 RESTful 服务的调用
+
+为了使得工程中使用 SOFATracer 的 HttpClient 能够正确埋点和打印日志，请根据 SOFA Boot 版本选择实现方法：
+
+- sofaboot-enterprise 3.1.0（即 tracer-parent 3.0.2 ）及之前的版本，使用`com.alipay.sofa.tracer.enterprise.plugins.SofaTracerEnterpriseHttpClientBuilder` 类去构造 HttpClient 的实例，并显式调用 `clientBuilder` 方法。
+- sofaboot-enterprise 3.1.1（即 tracer-parent 3.0.3 ）及之后的版本，使用`com.alipay.sofa.tracer.plugins.httpclient.SofaTracerHttpClientBuilder` 类去构造 HttpClient 的实例，并显式调用 `clientBuilder` 方法。
+
+`SofaTracerEnterpriseHttpClientBuilder` 类提供了 `clientBuilder`（同步）和 `asyncClientBuilder`（异步）方法，以构造出一个经过 SOFATracer 埋点的`org.apache.http.impl.client.HttpClientBuilder` 实例。方法签名如下：
+
+```java
+// 同步调用构造方法
+public static HttpClientBuilder clientBuilder(HttpClientBuilder clientBuilder);
+
+// 同步调用构造方法，并在日志中显示当前应用和目标应用的字段
+public static HttpClientBuilder clientBuilder(HttpClientBuilder clientBuilder,
+String currentApp, String targetApp);
+
+// 异步调用构造方法
+public static HttpAsyncClientBuilder asyncClientBuilder(HttpAsyncClientBuilder httpAsyncClientBuilder);
+
+// 异步调用构造方法，并在日志中显示当前应用和目标应用的字段
+public static HttpAsyncClientBuilder asyncClientBuilder(HttpAsyncClientBuilder httpAsyncClientBuilder,
+String currentApp, String targetApp);
+```
+
+
+
+构造 HttpClient 同步调用代码块示例：
+
+```java
+HttpClientBuilder httpClientBuilder = HttpClientBuilder.create();
+// SOFATracer
+// SofaTracerHttpClientBuilder.clientBuilder(httpClientBuilder);
+SofaTracerHttpClientBuilder.clientBuilder(httpClientBuilder, "testSyncClient", "testSyncServer");
+CloseableHttpClient httpClient=httpClientBuilder.setConnectionManager(connManager).disableAutomaticRetries()
+        .build();
+```
+
+
+
+构造 HttpClient 异步调用代码块示例：
+
+```java
+RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(6000).setConnectTimeout(6000).setConnectionRequestTimeout(6000).build();
+HttpAsyncClientBuilder httpAsyncClientBuilder = HttpAsyncClientBuilder.create();
+// SOFATracer
+// SofaTracerHttpClientBuilder.asyncClientBuilder(httpAsyncClientBuilder);
+SofaTracerHttpClientBuilder.asyncClientBuilder(httpAsyncClientBuilder, "testAsyncClient", "testAsyncServer");
+CloseableHttpAsyncClient asyncHttpclient = httpAsyncClientBuilder.setDefaultRequestConfig(requestConfig).build();
+```
+
+
+
+通过 `SofaTracerEnterpriseHttpClientBuilder` 构造的 HttpClient 实例在发起对上文的 RESTful 服务调用的时候，就会埋点 SOFATracer 的链路数据。
+
+
+
+### 添加 Controller
+
+如果您的 Web 工程中没有基于 Spring MVC 框架构建的 Controller，那么可以按照如下方式添加一个 Controller；如果已经有 Controller，那么可直接访问相应的服务。
+
+```
+package com.sofaboot.quickstart.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author: ljt
+ * @version: $Id: TracerMvcRestController.java, v 0.1 2024/05/15, ljt Exp $
+ */
+@RestController
+public class TracerHttpclientRestController {
+
+    /**
+     * 日志记录器对象
+     */
+    private static final Logger logger = LoggerFactory.getLogger(TracerHttpclientRestController.class);
+
+    private static final String TEMPLATE = "Hello, %s!";
+    private final AtomicLong counter = new AtomicLong();
+
+    /**
+     * Request http://localhost:8080/httpclient?name=
+     *
+     * @param name name
+     * @return Map of Result
+     */
+    @RequestMapping("/httpclient")
+    public Map<String, Object> httpclient(@RequestParam(value = "name", defaultValue = "httpclient") String name) {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("count", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+        return resultMap;
+    }
+}
+```
+
+
+
+### 运行工程
+
+可以将 SOFABoot 工程导入到 IDE 中，工程编译正确后，运行工程里面中的 main 方法启动应用。以上面添加的 Controller 为例，可以
+
+通过在浏览器中输入 http://localhost:8080/sync 来访问 REST 服务，结果类似如下：
+
+```json
+{"success":true,"count":1,"content":"Hello, httpclient!"}
+```
+
+
+
+通过在浏览器中输入 http://localhost:8080/async 来访问 REST 服务，结果类似如下：
+
+```json
+{"success":true,"count":2,"content":"Hello, httpclient!"}
+```
+
+
+
+在 SOFABoot 的配置文件 `application.properties` 中可定义日志打印目录。假设配置的日志打印目录是 `./logs`，即当前应用的根目录，应用名设置为 `spring.application.name=sofaboot-quickstart-tracer-httpclient`，那么在当前工程的根目录下可以看到类似如下结构的日志文件：
+
+```
+./logs
+├── spring.log
+└── tracelog
+    ├── httpclient-digest.log
+    ├── httpclient-stat.log
+    ├── spring-mvc-digest.log
+    ├── spring-mvc-stat.log
+    ├── static-info.log
+    └── tracer-self.log
+```
+
+
+
+#### 查看 HttpClient 摘要日志
+
+以 HttpClient 同步调用为例，摘要日志 `httpclient-digest.log` 如下：
+
+```json
+{"time":"2024-05-20 00:00:00.000","local.app":"testSyncClient","traceId":"c0a818011716227269771100121584","spanId":"0.1","span.kind":"client","result.code":"200","current.thread.name":"http-nio-8080-exec-1","time.cost.milliseconds":"149ms","request.url":"http://localhost:8080/httpclient","method":"GET","req.size.bytes":0,"resp.size.bytes":-1,"remote.app":"testSyncServer","sys.baggage":"","biz.baggage":""}
+{"time":"2024-05-20 00:00:00.000","local.app":"testAsyncClient","traceId":"c0a818011716227273488100221584","spanId":"0.1","span.kind":"client","result.code":"200","current.thread.name":"I/O dispatcher 1","time.cost.milliseconds":"23ms","request.url":"http://localhost:8080/httpclient","method":"GET","req.size.bytes":0,"resp.size.bytes":-1,"remote.app":"testAsyncServer","sys.baggage":"","biz.baggage":""}
+```
+
+对应 key 的说明如下：
+
+| key                    | 说明                    |
+| ---------------------- | ----------------------- |
+| time                   | 日志打印时间            |
+| local.app              | 当前应用名              |
+| traceId                | TraceId                 |
+| spanId                 | SpanId                  |
+| span.kind              | Span 类型               |
+| result.code            | 结果码                  |
+| current.thread.name    | 当前线程名称            |
+| time.cost.milliseconds | Span 耗时               |
+| request.url            | 请求 URL                |
+| method                 | 调用方法                |
+| req.size.bytes         | 请求数据大小            |
+| resp.size.bytes        | 响应数据大小            |
+| remote.app             | 目标应用名称            |
+| sys.baggage            | 系统透传的 baggage 数据 |
+| biz.baggage            | 业务透传的 baggage 数据 |
+
+
+
+#### 查看 HttpClient 统计日志
+
+以 HttpClient 同步调用为例，统计日志 `httpclient-stat.log` 如下：
+
+```json
+{"time":"2024-05-20 00:00:00.000","stat.key":{"method":"GET","local.app":"testSyncClient","request.url":"http://localhost:8080/httpclient"},"count":1,"total.cost.milliseconds":149,"success":"Y","load.test":"F"}
+{"time":"2024-05-20 00:00:00.000","stat.key":{"method":"GET","local.app":"testAsyncClient","request.url":"http://localhost:8080/httpclient"},"count":1,"total.cost.milliseconds":23,"success":"Y","load.test":"F"}
+```
+
+对应 key 的说明如下：
+
+| key                     | 说明                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| time                    | 日志打印时间                                                 |
+| stat.key.method         | 调用方法                                                     |
+| stat.key.local.app      | 当前应用名                                                   |
+| stat.key.request.url    | 请求 URL                                                     |
+| count                   | 请求次数                                                     |
+| total.cost.milliseconds | 请求总耗时                                                   |
+| success                 | 请求结果：true：表示请求成功。false：表示请求失败。          |
+| load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
 
