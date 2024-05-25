@@ -48,14 +48,13 @@ public class TracerDatasourceRestController {
 
             final String sql = "DROP TABLE IF EXISTS TEST;"
                     + "CREATE TABLE TEST("
-                    + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'userId',"
+                    + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
                     + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
                     + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
                     + ");"
-                    + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('张三', CURRENT_TIMESTAMP);"
-                    + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('李四', CURRENT_TIMESTAMP);"
-                    + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('王五', CURRENT_TIMESTAMP);";
-
+                    + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);"
+                    + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);"
+                    + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);";
             st.execute(sql);
 
             resultMap.put("success", true);
@@ -87,9 +86,11 @@ public class TracerDatasourceRestController {
             stmt.close(); // 关闭 Statement
 
             // 2. 再执行 CREATE TABLE
-            String createTableSql = "CREATE TABLE TEST(USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'userId'," +
-                    "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName'," +
-                    "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime');";
+            String createTableSql = "CREATE TABLE TEST("
+                    + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+                    + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
+                    + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
+                    + ");";
             stmt = conn.createStatement();
             stmt.execute(createTableSql);
             stmt.close(); // 关闭 Statement
@@ -134,13 +135,13 @@ public class TracerDatasourceRestController {
 
         final String sql = "DROP TABLE IF EXISTS TEST;"
                 + "CREATE TABLE TEST("
-                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'userId',"
+                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
                 + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
                 + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
                 + ");"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('张三', CURRENT_TIMESTAMP);"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('李四', CURRENT_TIMESTAMP);"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('王五', CURRENT_TIMESTAMP);";
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);";
         template.execute(sql);
 
         resultMap.put("success", true);

@@ -34,13 +34,13 @@ public class TracerDatasourceRestControllerTests {
     public void testCreate() throws Exception {
         final String sql = "DROP TABLE IF EXISTS TEST;"
                 + "CREATE TABLE TEST("
-                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'userId',"
+                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
                 + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
                 + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
                 + ");"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('张三', CURRENT_TIMESTAMP);"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('李四', CURRENT_TIMESTAMP);"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('王五', CURRENT_TIMESTAMP);";
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);";
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/create"))
                 .andExpect(MockMvcResultMatchers.status().isOk()) // 添加 status 断言
@@ -52,7 +52,13 @@ public class TracerDatasourceRestControllerTests {
 
     @Test
     public void testCreateStep() throws Exception {
-        final String sql = "DROP TABLE IF EXISTS TEST;CREATE TABLE TEST(USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'userId',USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime');INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES (?, CURRENT_TIMESTAMP);";
+        final String sql = "DROP TABLE IF EXISTS TEST;"
+                + "CREATE TABLE TEST("
+                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+                + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
+                + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
+                + ");"
+                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES (?, CURRENT_TIMESTAMP);";
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/createStep"))
                 .andExpect(MockMvcResultMatchers.status().isOk()) // 添加 status 断言
@@ -66,13 +72,13 @@ public class TracerDatasourceRestControllerTests {
     public void testExecute() throws Exception {
         final String sql = "DROP TABLE IF EXISTS TEST;"
                 + "CREATE TABLE TEST("
-                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'userId',"
+                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
                 + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
                 + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
                 + ");"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('张三', CURRENT_TIMESTAMP);"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('李四', CURRENT_TIMESTAMP);"
-                + "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES ('王五', CURRENT_TIMESTAMP);";
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);";
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/execute"))
                 .andExpect(MockMvcResultMatchers.status().isOk()) // 添加 status 断言

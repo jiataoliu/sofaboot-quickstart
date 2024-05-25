@@ -10,5 +10,4 @@ public class SofabootQuickstartTracerDatasourceApplication {
         SpringApplication.run(SofabootQuickstartTracerDatasourceApplication.class, args);
     }
 
-
 }
