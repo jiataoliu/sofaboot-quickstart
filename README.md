@@ -1,16 +1,16 @@
 # 参考文档
 
-https://www.sofastack.tech/projects/sofa-boot/quick-start/《SOFABoot 快速开始》
+https://www.sofastack.tech/projects/sofa-boot/quick-start/ 《SOFABoot 快速开始》
 
-https://help.aliyun.com/document_detail/133243.html《SOFABoot 快速入门》
+https://help.aliyun.com/document_detail/133243.html 《SOFABoot 快速入门》
 
-https://www.sofastack.tech/projects/sofa-tracer/usage-of-mvc/《SOFATracer 日志 Spring MVC 埋点接入》
+https://www.sofastack.tech/projects/sofa-tracer/usage-of-mvc/ 《SOFATracer 日志 Spring MVC 埋点接入》
 
-https://help.aliyun.com/document_detail/151860.html《SOFATracer 日志说明》
+https://help.aliyun.com/document_detail/151860.html 《SOFATracer 日志说明》
 
-https://help.aliyun.com/document_detail/151854.html《SOFATracer 日志采样模式》
+https://help.aliyun.com/document_detail/151854.html 《SOFATracer 日志采样模式》
 
-https://github.com/sofastack/sofa-tracer《SOFATracer 源码地址》
+https://github.com/sofastack/sofa-tracer 《SOFATracer 源码地址》
 
 
 
@@ -1769,7 +1769,7 @@ Druid 数据库连接池
 <dependency>
     <groupId>com.alibaba</groupId>
     <artifactId>druid-spring-boot-starter</artifactId>
-    <version>1.2.11</version>
+    <version>1.2.20</version>
 </dependency>
 <!-- H2 数据库 -->
 <dependency>
