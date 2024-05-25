@@ -10,6 +10,8 @@ https://help.aliyun.com/document_detail/151860.html《SOFATracer 日志说明》
 
 https://help.aliyun.com/document_detail/151854.html《SOFATracer 日志采样模式》
 
+https://github.com/sofastack/sofa-tracer《SOFATracer 源码地址》
+
 
 
 # 快速开始
@@ -1668,3 +1670,550 @@ public class TracerHttpclientRestController {
 | success                 | 请求结果：true：表示请求成功。false：表示请求失败。          |
 | load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
 
+
+
+## DataSource 埋点接入
+
+SOFATracer 2.2.0 基于标准的 JDBC 接口实现，支持对标准的数据库连接池（如 DBCP、Druid、c3p0、tomcat、HikariCP、BoneCP）埋点。本文档将介绍如何使用 SOFATracer 对 DataSource 进行埋点。
+
+- 已升级 SOFABoot 至 3.4.11 及以上版本。
+- 已基于 SOFABoot 构建了一个 Spring Web 工程。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.alipay.sofa</groupId>
+        <artifactId>sofaboot-dependencies</artifactId>
+        <version>3.11.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sofaboot.quickstart</groupId>
+    <artifactId>sofaboot-quickstart-tracer-datasource</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <name>sofaboot-quickstart-tracer-datasource</name>
+    <description>sofaboot-quickstart-tracer-datasource</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+
+
+### 引入 Tracer 依赖
+
+3.11.1 sofaboot-dependencies 的 sofa-tracer-datasource-plugin 生成的 统计日志 datasource-client-stat 的 resultCode 不兼容，所以用高版本的 sofa-tracer-datasource-plugin。
+
+```xml
+<!-- import SOFABoot Dependency Tracer starter -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>tracer-sofa-boot-starter</artifactId>
+    <exclusions>
+        <exclusion>
+            <groupId>com.alipay.sofa</groupId>
+            <artifactId>sofa-tracer-datasource-plugin</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<!-- 基于 SOFATracer 的 Datasource 插件 -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>sofa-tracer-datasource-plugin</artifactId>
+    <version>3.1.3</version>
+</dependency>
+```
+
+
+
+### **引入 数据库依赖 和 连接池依赖**
+
+H2 数据库 或者 Mysql 驱动包 二选一
+
+Druid 数据库连接池
+
+```xml
+<!-- Druid 数据库连接池 -->
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid-spring-boot-starter</artifactId>
+    <version>1.2.11</version>
+</dependency>
+<!-- H2 数据库 -->
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>runtime</scope>
+</dependency>
+<!-- Spring Boot Starter for JDBC -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+<!-- Mysql 驱动包 -->
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+</dependency>
+```
+
+
+
+### 添加 properties
+
+```properties
+# Application Name
+spring.application.name=sofaboot-quickstart-tracer-datasource
+# 日志输出目录，默认输出到 ${user.home}
+logging.path=./logs
+
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.enabled=true
+server.servlet.encoding.force=true
+
+# h2 web consloe 路径
+spring.h2.console.path=/h2-console
+# 开启 h2 web consloe，默认为 false
+spring.h2.console.enabled=true
+# 允许远程访问 h2 web consloe
+spring.h2.console.settings.web-allow-others=true
+
+# h2 数据源配置
+spring.datasource.url=jdbc:h2:~/test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=sa123456
+
+# mysql 数据源配置
+# allowMultiQueries=true 来启用多语句支持，注意会增加SQL注入的风险
+#spring.datasource.url=jdbc:mysql://localhost:3306/test?allowMultiQueries=true&useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+#spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+#spring.datasource.username=root
+#spring.datasource.password=123456
+
+# Druid 配置
+spring.datasource.type=com.alibaba.druid.pool.DruidDataSource
+spring.datasource.druid.initial-size=5
+spring.datasource.druid.max-active=20
+spring.datasource.druid.min-idle=5
+spring.datasource.druid.max-wait=60000
+spring.datasource.druid.time-between-eviction-runs-millis=60000
+spring.datasource.druid.min-evictable-idle-time-millis=300000
+spring.datasource.druid.validation-query=SELECT 1 FROM DUAL
+spring.datasource.druid.test-while-idle=true
+spring.datasource.druid.test-on-borrow=false
+spring.datasource.druid.test-on-return=false
+spring.datasource.druid.pool-prepared-statements=true
+spring.datasource.druid.max-pool-prepared-statement-per-connection-size=20
+# Druid 提供了多种内置 Filter，如用于 SQL 监控的 StatFilter、用于防御 SQL 注入攻击的 WallFilter
+#spring.datasource.druid.filters=stat,wall,slf4j
+spring.datasource.druid.filters=stat,slf4j
+spring.datasource.druid.connection-properties=druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
+spring.datasource.druid.web-stat-filter.enabled=true
+spring.datasource.druid.stat-view-servlet.enabled=true
+spring.datasource.druid.stat-view-servlet.url-pattern=/druid/*
+spring.datasource.druid.stat-view-servlet.allow=127.0.0.1
+spring.datasource.druid.filter.stat.enabled=true
+spring.datasource.druid.filter.stat.log-slow-sql=true
+spring.datasource.druid.filter.stat.slow-sql-millis=1000
+spring.datasource.druid.filter.stat.merge-sql=true
+spring.datasource.druid.filter.wall.config.multi-statement-allow=true
+spring.datasource.druid.stat-view-servlet.login-username=admin
+spring.datasource.druid.stat-view-servlet.login-password=admin123456
+
+# 参考文档：https://help.aliyun.com/document_detail/151854.html
+# 采样率 (0~100)%
+com.alipay.sofa.tracer.samplerPercentage=100
+# 采样模式类型名称
+#com.alipay.sofa.tracer.samplerName=PercentageBasedSampler
+
+# 统计日志的时间间隔，默认 60，这里为了方便快速看统计设置成 1
+com.alipay.sofa.tracer.statLogInterval=1
+com.alipay.sofa.tracer.zipkin.enabled=false
+
+# 是否以 JSON 格式输出日志，使用非 JSON 格式输出，期望较少日志空间占用
+#com.alipay.sofa.tracer.JSONOutput=false
+
+com.alipay.sofa.tracer.datasource.enable=true
+```
+
+
+
+### 添加 Controller
+
+新建一个 REST 服务，触发 SQL 语句执行，便于查看 SQL 的 Tracer 记录。在以下 REST 服务创建中，触发了一个建表操作。
+
+```java
+package com.sofaboot.quickstart.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author: ljt
+ * @version: $Id: TracerDatasourceRestController.java, v 0.1 2024/05/22, ljt Exp $
+ */
+@RestController
+public class TracerDatasourceRestController {
+
+    /**
+     * 日志记录器对象
+     */
+    private static final Logger logger = LoggerFactory.getLogger(TracerDatasourceRestController.class);
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private JdbcTemplate template;
+
+    /**
+     * Request http://localhost:8080/create
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/create")
+    public Map<String, Object> create() {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+
+        try (Connection cn = dataSource.getConnection();
+             Statement st = cn.createStatement()) {
+
+            final String sql = "DROP TABLE IF EXISTS TEST;"
+                    + "CREATE TABLE TEST("
+                    + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+                    + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
+                    + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
+                    + ");"
+                    + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);"
+                    + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);"
+                    + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);";
+            st.execute(sql);
+
+            resultMap.put("success", true);
+            resultMap.put("result", sql);
+        } catch (Throwable throwable) {
+            resultMap.put("success", false);
+            resultMap.put("error", throwable.getMessage());
+        }
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/createStep
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/createStep")
+    public Map<String, Object> createStep() {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+
+        // 假设您有一个已经设置好的 Connection 对象叫 conn
+        try {
+            Connection conn = dataSource.getConnection();
+
+            // 1. 先执行 DROP TABLE IF EXISTS
+            String dropTableSql = "DROP TABLE IF EXISTS TEST;";
+            Statement stmt = conn.createStatement();
+            stmt.execute(dropTableSql);
+            stmt.close(); // 关闭 Statement
+
+            // 2. 再执行 CREATE TABLE
+            String createTableSql = "CREATE TABLE TEST("
+                    + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+                    + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
+                    + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
+                    + ");";
+            stmt = conn.createStatement();
+            stmt.execute(createTableSql);
+            stmt.close(); // 关闭 Statement
+
+            // 3. 接着执行 INSERT 语句（可以循环或分别执行）
+            String insertSqlTemplate = "INSERT INTO TEST (USER_NAME, CREATE_TIME) VALUES (?, CURRENT_TIMESTAMP);";
+            PreparedStatement pstmt = conn.prepareStatement(insertSqlTemplate);
+
+            // 插入张三
+            pstmt.setString(1, "张三");
+            pstmt.executeUpdate();
+
+            // 插入李四
+            pstmt.setString(1, "李四");
+            pstmt.executeUpdate();
+
+            // 插入王五
+            pstmt.setString(1, "王五");
+            pstmt.executeUpdate();
+
+            pstmt.close(); // 关闭 PreparedStatement
+
+            resultMap.put("success", true);
+            resultMap.put("result", dropTableSql + createTableSql + insertSqlTemplate);
+
+        } catch (Throwable throwable) {
+            resultMap.put("success", false);
+            resultMap.put("error", throwable.getMessage());
+        }
+
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/execute
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/execute")
+    public Map<String, Object> execute() {
+        Map<String, Object> resultMap = new HashMap<>();
+
+        final String sql = "DROP TABLE IF EXISTS TEST;"
+                + "CREATE TABLE TEST("
+                + "USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+                + "USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',"
+                + "CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime'"
+                + ");"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);"
+                + "INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);";
+        template.execute(sql);
+
+        resultMap.put("success", true);
+        resultMap.put("result", sql);
+
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/selectOne/1
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/selectOne/{userId}")
+    public Map<String, Object> selectOne(@PathVariable(value = "userId") int userId) {
+        Map<String, Object> resultMap = new HashMap<>();
+
+        final String sql = "SELECT * FROM TEST WHERE USER_ID = ?";
+        Map<String, Object> item = template.queryForObject(sql, new Object[]{userId}, (result, rowNum) ->
+                new HashMap<String, Object>() {{
+                    put("userId", result.getInt("USER_ID"));
+                    put("userName", result.getString("USER_NAME"));
+                    put("createTime", result.getDate("CREATE_TIME"));
+                }}
+        );
+
+        resultMap.put("success", true);
+        resultMap.put("result", item);
+
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/selectAll
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/selectAll")
+    public Map<String, Object> selectAll() {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+
+        final String sql = "SELECT * FROM TEST;";
+        List<Map> items = template.query(sql, (result, rowNum) ->
+                new HashMap<String, Object>() {{
+                    put("userId", result.getInt("USER_ID"));
+                    put("userName", result.getString("USER_NAME"));
+                    put("createTime", result.getDate("CREATE_TIME"));
+                }}
+        );
+
+        resultMap.put("success", true);
+        resultMap.put("result", items);
+
+        return resultMap;
+    }
+}
+```
+
+
+
+### 运行工程
+
+可以将 SOFABoot 工程导入到 IDE 中，工程编译正确后，运行工程里面中的 main 方法启动应用。以上面添加的 Controller 为例，可以
+
+通过在浏览器中输入 http://localhost:8080/create 来访问 REST 服务，结果类似如下：
+
+```json
+{
+    "result": "DROP TABLE IF EXISTS TEST;CREATE TABLE TEST(USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,USER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName',CREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime');INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (1, '张三', CURRENT_TIMESTAMP);INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (2, '李四', CURRENT_TIMESTAMP);INSERT INTO TEST (USER_ID, USER_NAME, CREATE_TIME) VALUES (3, '王五', CURRENT_TIMESTAMP);",
+    "success": true
+}
+```
+
+在 SOFABoot 的配置文件 `application.properties` 中可定义日志打印目录。假设配置的日志打印目录是 `./logs`，即当前应用的根目录，应用名设置为 `spring.application.name=sofaboot-quickstart-tracer-datasource`，那么在当前工程的根目录下可以看到类似如下结构的日志文件：
+
+```
+./logs
+├── spring.log
+└── tracelog
+    ├── datasource-client-digest.log
+    ├── datasource-client-stat.log
+    ├── spring-mvc-digest.log
+    ├── spring-mvc-stat.log
+    ├── static-info.log
+    └── tracer-self.log
+```
+
+可以在 `./logs/datasource-client-digest.log` 和 `./logs/datasource-client-stat.log` 看到 SQL 执行的 Tracer 日志。
+
+
+
+#### 查看 DataSource 摘要日志
+
+以 DataSource 同步调用为例，摘要日志 `datasource-client-digest` 如下：
+
+```json
+{"time":"2024-05-24 00:00:00.000","local.app":"sofaboot-quickstart-tracer-datasource","traceId":"c0a818011716653054033100122820","spanId":"0.1","span.kind":"client","result.code":"success","current.thread.name":"http-nio-8080-exec-2","time.cost.milliseconds":"37ms","database.name":"test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE","sql":"DROP TABLE IF EXISTS TEST;CREATE TABLE TEST(USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY%2CUSER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName'%2CCREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime');INSERT INTO TEST (USER_ID%2C USER_NAME%2C CREATE_TIME) VALUES (1%2C '张三'%2C CURRENT_TIMESTAMP);INSERT INTO TEST (USER_ID%2C USER_NAME%2C CREATE_TIME) VALUES (2%2C '李四'%2C CURRENT_TIMESTAMP);INSERT INTO TEST (USER_ID%2C USER_NAME%2C CREATE_TIME) VALUES (3%2C '王五'%2C CURRENT_TIMESTAMP);","connection.establish.span":"0ms","db.execute.cost":"37ms","database.type":"h2","database.endpoint":"jdbc:h2:~/test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE:-1","sys.baggage":"","biz.baggage":""}
+```
+
+对应 key 的说明如下：
+
+| key                       | 说明                                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| time                      | 日志打印时间                                                 |
+| local.app                 | 当前应用名                                                   |
+| traceId                   | TraceId                                                      |
+| spanId                    | SpanId                                                       |
+| span.kind                 | Span 类型                                                    |
+| result.code               | 结果码，取值如下：00：请求成功。03：请求超时。99：请求失败。 |
+| current.thread.name       | 当前线程名                                                   |
+| time.cost.milliseconds    | Span 耗时                                                    |
+| database.name             | 数据库名称                                                   |
+| SQL                       | SQL 执行语句                                                 |
+| connection.establish.span | SQL 执行建连时间                                             |
+| db.execute.cost           | SQL 执行时间                                                 |
+| database.type             | 数据库类型                                                   |
+| database.endpoint         | 数据库 URL                                                   |
+| sys.baggage               | 系统透传的 baggage 数据，以 KV（key-value）格式展示。        |
+| biz.baggage               | 业务透传的 baggage 数据，以 KV 格式展示。                    |
+
+
+
+#### 查看 DataSource 统计日志
+
+以 DataSource 同步调用为例，统计日志 `datasource-client-stat.log` 如下：
+
+```json
+{"time":"2024-05-24 00:00:00.000","stat.key":{"local.app":"sofaboot-quickstart-tracer-datasource","database.name":"test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE","sql":"DROP TABLE IF EXISTS TEST;CREATE TABLE TEST(USER_ID INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY%2CUSER_NAME VARCHAR(255) DEFAULT '' COMMENT 'userName'%2CCREATE_TIME DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'createTime');INSERT INTO TEST (USER_ID%2C USER_NAME%2C CREATE_TIME) VALUES (1%2C '张三'%2C CURRENT_TIMESTAMP);INSERT INTO TEST (USER_ID%2C USER_NAME%2C CREATE_TIME) VALUES (2%2C '李四'%2C CURRENT_TIMESTAMP);INSERT INTO TEST (USER_ID%2C USER_NAME%2C CREATE_TIME) VALUES (3%2C '王五'%2C CURRENT_TIMESTAMP);"},"count":1,"total.cost.milliseconds":37,"success":"Y","load.test":"F"}
+```
+
+对应 key 的说明如下：
+
+| key                     | 说明                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| time                    | 日志打印时间                                                 |
+| stat.key.local.app      | 当前应用名                                                   |
+| stat.key.database.name  | 数据库名称                                                   |
+| stat.key.sql            | SQL 执行语句                                                 |
+| count                   | SQL 执行次数                                                 |
+| total.cost.milliseconds | SQL 执行总耗时。单位：ms。                                   |
+| success                 | 请求结果：true：表示请求成功。false：表示请求失败。          |
+| load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
+
+
+
+# SOFABoot 安全兼容版本
+
+| **依赖**       | **包/组件名称**                | **3.6.6 版本** | **3.10.2 版本** |
+| -------------- | ------------------------------ | -------------- | --------------- |
+| 安全版本升级   | SpringBoot                     | 2.3.12         | 2.7.15          |
+|                | Spring Framework               | 5.2.21         | 5.3.29          |
+|                | logback                        | 1.2.8          | 1.2.12          |
+|                | slf4j                          | 1.7.30         | 1.7.36          |
+|                | gson                           | 2.8.9          | 2.9.1           |
+|                | protobuf-java                  | 3.11.0         | 3.21.12         |
+|                | jackson                        | 2.11.4         | 2.14.2          |
+|                | okhttp                         | 3.14.9         | 4.9.3           |
+|                | commons-beanutils              | 2.9.3          | 2.9.4           |
+|                | commons-fileupload             | 1.4            | 1.5             |
+|                | resteasy                       | 3.6.3.Final    | 3.11.3.Final    |
+|                | netty                          | 4.1.65.Final   | 4.1.97.Final    |
+|                | tomcat                         | 9.0.43         | 9.0.79          |
+|                | aviator                        | 4.2.7          | 5.3.3           |
+|                | ant                            | 1.7.1          | 1.9.16          |
+|                | groovy                         | 2.5.14         | 3.0.19          |
+|                | hibernate-validator            | 5.2.4.Final    | 6.2.5.Final     |
+|                | jasypt                         | 1.5            | 1.9.3           |
+|                | velocity                       | 1.6            | 1.7             |
+|                | snakeyaml                      | 1.32           | 1.33            |
+| SOFA 依赖      | SOFABoot 开源版                | 3.11.1         | 3.19.1          |
+|                | sofa-common-tools              | 1.3.6          | 1.3.11          |
+|                | registry-client-enterprise-all | 5.5.1.RELEASE  | 5.6.0           |
+| 间接的三方依赖 | commons-logging                | 1.1.1          | 1.1.2           |
+|                | commons-pool                   | 1.3            | 1.6             |
+|                | commons-lang                   | 3.3.10         | 3.3.12.0        |
+|                | io.prometheus:simpleclient     | 0.10.0         | 0.15.0          |
+|                | com.beust:jcommander           | 1.72           | 1.78            |
+|                | json-path                      | 2.4.0          | 2.7.0           |
+|                | okio                           | 1.17.2         | 2.8.0           |
+|                | javax.mail                     | 1.6.2          | 1.6.7           |
+|                | picocli                        | 4.3.2          | 4.6.3           |
+|                | byte-buddy                     | 1.10.22        | 1.12.23         |
+|                | net.minidev                    | 2.3.1          | 2.4.11          |
+|                | apiguardian-api                | 1.1.0          | 1.1.2           |
+|                | assertj-core                   | 3.16.1         | 3.22.0          |
+|                | org.glassfish.jaxb             | 2.3.4          | 2.3.8           |
+|                | javassist                      | 3.19.0-GA      | 3.28.0-GA       |
+|                | jboss-logging                  | 3.4.2.Final    | 3.4.3.Final     |
+|                | jboss-annotations-api_1.3_spec | 1.0.1.Final    | 2.0.1.Final     |
+|                | objenesis                      | 2.6            | 3.1             |
+|                | asm                            | 5.0.4          | 9.3             |
+|                | reactive-streams               | 1.0.3          | 1.0.4           |
+|                | jsonassert                     | 1.5.0          | 1.5.1           |
+| 测试框架       | junit                          | 5.6.3          | 5.8.2           |
+|                | junit-platform                 | 1.6.3          | 1.8.2           |
+|                | mockito                        | 3.3.3          | 3.6.28          |
+|                | testng                         | 6.13.1         | 7.5             |
