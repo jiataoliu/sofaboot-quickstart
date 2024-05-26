@@ -25,5 +25,6 @@
         <module>sofaboot-quickstart-tracer-mvc</module>
         <module>sofaboot-quickstart-tracer-httpclient</module>
         <module>sofaboot-quickstart-tracer-datasource</module>
+        <module>sofaboot-quickstart-tracer-resttemplate</module>
     </modules>
 </project>

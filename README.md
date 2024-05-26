@@ -1534,7 +1534,7 @@ CloseableHttpAsyncClient asyncHttpclient = httpAsyncClientBuilder.setDefaultRequ
 
 如果您的 Web 工程中没有基于 Spring MVC 框架构建的 Controller，那么可以按照如下方式添加一个 Controller；如果已经有 Controller，那么可直接访问相应的服务。
 
-```
+```java
 package com.sofaboot.quickstart.controller;
 
 import org.slf4j.Logger;
@@ -1619,7 +1619,7 @@ public class TracerHttpclientRestController {
 
 #### 查看 HttpClient 摘要日志
 
-以 HttpClient 同步调用为例，摘要日志 `httpclient-digest.log` 如下：
+以 HttpClient 同步调用和异步调用为例，摘要日志 `httpclient-digest.log` 如下：
 
 ```json
 {"time":"2024-05-20 00:00:00.000","local.app":"testSyncClient","traceId":"c0a818011716227269771100121584","spanId":"0.1","span.kind":"client","result.code":"200","current.thread.name":"http-nio-8080-exec-1","time.cost.milliseconds":"149ms","request.url":"http://localhost:8080/httpclient","method":"GET","req.size.bytes":0,"resp.size.bytes":-1,"remote.app":"testSyncServer","sys.baggage":"","biz.baggage":""}
@@ -1650,7 +1650,7 @@ public class TracerHttpclientRestController {
 
 #### 查看 HttpClient 统计日志
 
-以 HttpClient 同步调用为例，统计日志 `httpclient-stat.log` 如下：
+以 HttpClient 同步调用和异步调用为例，统计日志 `httpclient-stat.log` 如下：
 
 ```json
 {"time":"2024-05-20 00:00:00.000","stat.key":{"method":"GET","local.app":"testSyncClient","request.url":"http://localhost:8080/httpclient"},"count":1,"total.cost.milliseconds":149,"success":"Y","load.test":"F"}
@@ -2160,6 +2160,310 @@ public class TracerDatasourceRestController {
 | stat.key.sql            | SQL 执行语句                                                 |
 | count                   | SQL 执行次数                                                 |
 | total.cost.milliseconds | SQL 执行总耗时。单位：ms。                                   |
+| success                 | 请求结果：true：表示请求成功。false：表示请求失败。          |
+| load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
+
+
+
+## RestTemplate 埋点接入
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.alipay.sofa</groupId>
+        <artifactId>sofaboot-dependencies</artifactId>
+        <version>3.11.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sofaboot.quickstart</groupId>
+    <artifactId>sofaboot-quickstart-tracer-resttemplate</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <name>sofaboot-quickstart-tracer-resttemplate</name>
+    <description>sofaboot-quickstart-tracer-resttemplate</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+
+
+### 引入 Tracer 依赖
+
+1. 在 SOFABoot 的 Web 项目中引入如下 Tracer 依赖：
+
+```xml
+<!-- import SOFABoot Dependency Tracer starter -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>tracer-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+添加 Tracer starter 依赖后，可在 SOFABoot 的全局配置文件中添加配置项目以定制 Tracer 的行为。详情见 [Tracer 配置项说明](https://help.aliyun.com/document_detail/151843.html?spm=a2c4g.280407.0.0.65896f45o7OjVg#h2-tracer-5)。
+
+
+
+### 添加 properties
+
+```properties
+# Application Name
+spring.application.name=sofaboot-quickstart-tracer-resttemplate
+# 日志输出目录，默认输出到 ${user.home}
+logging.path=./logs
+
+# 参考文档：https://help.aliyun.com/document_detail/151854.html
+# 采样率 (0~100)%
+com.alipay.sofa.tracer.samplerPercentage=100
+# 采样模式类型名称
+#com.alipay.sofa.tracer.samplerName=PercentageBasedSampler
+
+# 统计日志的时间间隔，默认 60，这里为了方便快速看统计设置成 1
+com.alipay.sofa.tracer.statLogInterval=1
+com.alipay.sofa.tracer.zipkin.enabled=false
+
+# 是否以 JSON 格式输出日志，使用非 JSON 格式输出，期望较少日志空间占用
+#com.alipay.sofa.tracer.JSONOutput=false
+```
+
+
+
+### 添加 Controller
+
+如果您的 Web 工程中没有基于 Spring MVC 框架构建的 Controller，那么可以按照如下方式添加一个 Controller；如果已经有 Controller，那么可直接访问相应的服务。
+
+```java
+package com.sofaboot.quickstart.controller;
+
+import com.sofa.alipay.tracer.plugins.rest.SofaTracerRestTemplateBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author: ljt
+ * @version: $Id: TracerResttemplateRestController.java, v 0.1 2024/05/27, ljt Exp $
+ */
+@RestController
+public class TracerResttemplateRestController {
+
+    /**
+     * 日志记录器对象
+     */
+    private static final Logger logger = LoggerFactory.getLogger(TracerResttemplateRestController.class);
+
+    private static final String TEMPLATE = "Hello, %s!";
+    private final AtomicLong counter = new AtomicLong();
+
+    /**
+     * Request http://localhost:8080/syncRest?name=syncRest
+     *
+     * @param name name
+     * @return Map of Result
+     */
+    @RequestMapping("/syncRest")
+    public Map<String, Object> syncRest(@RequestParam(value = "name", defaultValue = "syncRest") String name) {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("count", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+
+        logger.info("syncRest execute finish ...");
+
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/asyncRest?name=asyncRest
+     *
+     * @param name name
+     * @return Map of Result
+     */
+    @RequestMapping("/asyncRest")
+    public Map<String, Object> asyncRest(@RequestParam(value = "name", defaultValue = "asyncRest") String name) throws InterruptedException {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("count", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+
+        Thread.sleep(2000);
+        logger.info("asyncRest execute finish ...");
+
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/sync
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/sync")
+    public ResponseEntity sync() {
+        String httpGetUrl = "http://localhost:8080/syncRest";
+        // sync
+        RestTemplate restTemplate = SofaTracerRestTemplateBuilder.buildRestTemplate();
+        ResponseEntity<String> responseEntity = restTemplate.getForEntity(httpGetUrl, String.class);
+        logger.info("Response is {}", responseEntity);
+
+        return responseEntity;
+    }
+
+    /**
+     * Request http://localhost:8080/async
+     *
+     * @return Map of Result
+     */
+    @RequestMapping("/async")
+    public ResponseEntity async() {
+        String httpGetUrl = "http://localhost:8080/asyncRest";
+        // async
+        RestTemplate restTemplate = SofaTracerRestTemplateBuilder.buildRestTemplate();
+        ResponseEntity<String> responseEntity = restTemplate.getForEntity(httpGetUrl, String.class);
+        logger.info("Response is {}", responseEntity);
+
+        return responseEntity;
+    }
+}
+```
+
+
+
+### 运行工程
+
+可以将 SOFABoot 工程导入到 IDE 中，工程编译正确后，运行工程里面中的 main 方法启动应用。以上面添加的 Controller 为例，可以
+
+通过在浏览器中输入 http://localhost:8080/sync 来访问 REST 服务，结果类似如下：
+
+```json
+{ "success": true, "count": 1, "content": "Hello, syncRest!" }
+```
+
+
+
+通过在浏览器中输入 http://localhost:8080/async 来访问 REST 服务，结果类似如下：
+
+```json
+{ "success": true, "count": 2, "content": "Hello, asyncRest!" }
+```
+
+
+
+调用成功的控制台输出日志如下：
+
+```
+2024-05-27 00:00:00.000  INFO 28924 --- [nio-8080-exec-3] c.s.q.c.TracerResttemplateRestController : syncRest execute finish ...
+2024-05-27 00:00:00.000  INFO 28924 --- [nio-8080-exec-2] c.s.q.c.TracerResttemplateRestController : Response is <200,{"success":true,"count":1,"content":"Hello, syncRest!"},[Content-Type:"application/json", Transfer-Encoding:"chunked", Date:"Sun, 26 May 2024 18:44:41 GMT", Keep-Alive:"timeout=60", Connection:"keep-alive"]>
+2024-05-27 00:00:00.000  INFO 28924 --- [nio-8080-exec-5] c.s.q.c.TracerResttemplateRestController : asyncRest execute finish ...
+2024-05-27 00:00:00.000  INFO 28924 --- [nio-8080-exec-4] c.s.q.c.TracerResttemplateRestController : Response is <200,{"success":true,"count":2,"content":"Hello, asyncRest!"},[Content-Type:"application/json", Transfer-Encoding:"chunked", Date:"Sun, 26 May 2024 18:44:54 GMT", Keep-Alive:"timeout=60", Connection:"keep-alive"]>
+```
+
+
+
+在 SOFABoot 的配置文件 `application.properties` 中可定义日志打印目录。假设配置的日志打印目录是 `./logs`，即当前应用的根目录，应用名设置为 `spring.application.name=sofaboot-quickstart-tracer-resttemplate`，那么在当前工程的根目录下可以看到类似如下结构的日志文件：
+
+```
+./logs
+├── spring.log
+└── tracelog
+    ├── resttemplate-digest.log
+    ├── resttemplate-stat.log
+    ├── spring-mvc-digest.log
+    ├── spring-mvc-stat.log
+    ├── static-info.log
+    └── tracer-self.log
+```
+
+
+
+#### 查看 RestTemplate 摘要日志
+
+以 RestTemplate 同步调用和异步调用为例，摘要日志 `resttemplate-digest.log` 如下：
+
+```json
+{"time":"2024-05-27 00:00:00.000","local.app":"sofaboot-quickstart-tracer-resttemplate","traceId":"c0a818011716749081129100128924","spanId":"0.1","span.kind":"client","result.code":"200","current.thread.name":"http-nio-8080-exec-2","time.cost.milliseconds":"59ms","request.url":"http://localhost:8080/syncRest","method":"GET","resp.size.bytes":0,"resp.size.bytes":0,"error":"","sys.baggage":"","biz.baggage":""}
+{"time":"2024-05-27 00:00:00.000","local.app":"sofaboot-quickstart-tracer-resttemplate","traceId":"c0a818011716749092476100228924","spanId":"0.1","span.kind":"client","result.code":"200","current.thread.name":"http-nio-8080-exec-4","time.cost.milliseconds":"2016ms","request.url":"http://localhost:8080/asyncRest","method":"GET","resp.size.bytes":0,"resp.size.bytes":0,"error":"","sys.baggage":"","biz.baggage":""}
+```
+
+对应 key 的说明如下：
+
+| key                    | 说明                    |
+| ---------------------- | ----------------------- |
+| time                   | 日志打印时间            |
+| local.app              | 当前应用名              |
+| traceId                | TraceId                 |
+| spanId                 | SpanId                  |
+| span.kind              | Span 类型               |
+| result.code            | 结果码                  |
+| current.thread.name    | 当前线程名              |
+| time.cost.milliseconds | Span 耗时               |
+| request.url            | 请求 URL                |
+| method                 | 调用方法                |
+| req.size.bytes         | 请求数据大小            |
+| resp.size.bytes        | 响应数据大小            |
+| sys.baggage            | 系统透传的 baggage 数据 |
+| biz.baggage            | 业务透传的 baggage 数据 |
+
+
+
+#### 查看 RestTemplate 统计日志
+
+以 RestTemplate 同步调用和异步调用为例，统计日志 `resttemplate-stat.log` 如下：
+
+```json
+{"time":"2024-05-27 00:00:00.000","stat.key":{"method":"GET","local.app":"sofaboot-quickstart-tracer-resttemplate","request.url":"http://localhost:8080/syncRest"},"count":1,"total.cost.milliseconds":59,"success":"Y","load.test":"F"}
+{"time":"2024-05-27 00:00:00.000","stat.key":{"method":"GET","local.app":"sofaboot-quickstart-tracer-resttemplate","request.url":"http://localhost:8080/asyncRest"},"count":1,"total.cost.milliseconds":2016,"success":"Y","load.test":"F"}
+```
+
+对应 key 的说明如下：
+
+| key                     | 说明                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| time                    | 日志打印时间                                                 |
+| stat.key.method         | 调用方法                                                     |
+| stat.key.local.app      | 当前应用名                                                   |
+| stat.key.request.url    | 请求 URL                                                     |
+| count                   | 请求次数                                                     |
+| total.cost.milliseconds | 请求总耗时                                                   |
 | success                 | 请求结果：true：表示请求成功。false：表示请求失败。          |
 | load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
 
