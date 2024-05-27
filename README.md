@@ -1417,7 +1417,7 @@ public class TracerMvcRestController {
 
 2. 基于 SOFATracer 的 HttpClient 插件
 
-为了使得 HttpClient 这个第三方开源组件能够支持 SOFATracer 的链路调用，SOFATracer 提供了 HttpClient 的插件扩展，即 `tracer-enterprise-httpclient-plugin`：
+为了使得 HttpClient 这个第三方开源组件能够支持 SOFATracer 的链路调用，SOFATracer 提供了 HttpClient 的插件扩展，即 `sofa-tracer-httpclient-plugin`：
 
 ```xml
 <!-- 基于 SOFATracer 的 HttpClient 插件 -->
@@ -2236,6 +2236,20 @@ public class TracerDatasourceRestController {
 
 
 
+2. 基于 SOFATracer 的 RestTemplate 插件
+
+为了使得 RestTemplate 这个第三方开源组件能够支持 SOFATracer 的链路调用，SOFATracer 提供了 RestTemplate 的插件扩展，即 `sofa-tracer-resttmplate-plugin`：
+
+```xml
+<!-- 基于 SOFATracer 的 RestTemplate 插件 -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>sofa-tracer-resttmplate-plugin</artifactId>
+</dependency>
+```
+
+
+
 ### 添加 properties
 
 ```properties
@@ -2452,6 +2466,295 @@ public class TracerResttemplateRestController {
 ```json
 {"time":"2024-05-27 00:00:00.000","stat.key":{"method":"GET","local.app":"sofaboot-quickstart-tracer-resttemplate","request.url":"http://localhost:8080/syncRest"},"count":1,"total.cost.milliseconds":59,"success":"Y","load.test":"F"}
 {"time":"2024-05-27 00:00:00.000","stat.key":{"method":"GET","local.app":"sofaboot-quickstart-tracer-resttemplate","request.url":"http://localhost:8080/asyncRest"},"count":1,"total.cost.milliseconds":2016,"success":"Y","load.test":"F"}
+```
+
+对应 key 的说明如下：
+
+| key                     | 说明                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| time                    | 日志打印时间                                                 |
+| stat.key.method         | 调用方法                                                     |
+| stat.key.local.app      | 当前应用名                                                   |
+| stat.key.request.url    | 请求 URL                                                     |
+| count                   | 请求次数                                                     |
+| total.cost.milliseconds | 请求总耗时                                                   |
+| success                 | 请求结果：true：表示请求成功。false：表示请求失败。          |
+| load.test               | 判断当前是否为全链路压测：T：表示当前为全链路压测。当前线程中能获取到日志上下文，且上下文中有压测信息。F：表示当前非全链路压测。当前线程中不能获取到日志上下文，或上下文中没有压测信息。 |
+
+
+
+## OkHttp 埋点接入
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.alipay.sofa</groupId>
+        <artifactId>sofaboot-dependencies</artifactId>
+        <version>3.11.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sofaboot.quickstart</groupId>
+    <artifactId>sofaboot-quickstart-tracer-okhttp</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <name>sofaboot-quickstart-tracer-okhttp</name>
+    <description>sofaboot-quickstart-tracer-okhttp</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+
+
+### 引入 Tracer 依赖
+
+1. 在 SOFABoot 的 Web 项目中引入如下 Tracer 依赖：
+
+```xml
+<!-- import SOFABoot Dependency Tracer starter -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>tracer-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+添加 Tracer starter 依赖后，可在 SOFABoot 的全局配置文件中添加配置项目以定制 Tracer 的行为。详情见 [Tracer 配置项说明](https://help.aliyun.com/document_detail/151843.html?spm=a2c4g.280407.0.0.65896f45o7OjVg#h2-tracer-5)。
+
+
+
+2. 基于 SOFATracer 的 OkHttp 插件
+
+为了使得 OkHttp 这个第三方开源组件能够支持 SOFATracer 的链路调用，SOFATracer 提供了 OkHttp 的插件扩展，即 `sofa-tracer-okhttp-plugin`：
+
+```xml
+<!-- 基于 SOFATracer 的 OkHttp 插件 -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>sofa-tracer-okhttp-plugin</artifactId>
+</dependency>
+```
+
+
+
+3. OkHttp 依赖
+
+```xml
+<!-- OkHttp 依赖 -->
+<dependency>
+    <groupId>com.squareup.okhttp3</groupId>
+    <artifactId>okhttp</artifactId>
+    <version>3.12.1</version>
+</dependency>
+```
+
+
+
+### 添加 properties
+
+```properties
+# Application Name
+spring.application.name=sofaboot-quickstart-tracer-okhttp
+# 日志输出目录，默认输出到 ${user.home}
+logging.path=./logs
+
+# 参考文档：https://help.aliyun.com/document_detail/151854.html
+# 采样率 (0~100)%
+com.alipay.sofa.tracer.samplerPercentage=100
+# 采样模式类型名称
+#com.alipay.sofa.tracer.samplerName=PercentageBasedSampler
+
+# 统计日志的时间间隔，默认 60，这里为了方便快速看统计设置成 1
+com.alipay.sofa.tracer.statLogInterval=1
+com.alipay.sofa.tracer.zipkin.enabled=false
+
+# 是否以 JSON 格式输出日志，使用非 JSON 格式输出，期望较少日志空间占用
+#com.alipay.sofa.tracer.JSONOutput=false
+```
+
+
+
+### 构造 OkHttp 发起一次对上文的 RESTful 服务的调用
+
+构造 OkHttp Client 调用实例的代码示例如下：
+
+```java
+String httpGetUrl = "http://localhost:8080/okhttp";
+String responseStr = new OkhttpClientInstance().executeGet(httpGetUrl);
+```
+
+
+
+### 添加 Controller
+
+如果您的 Web 工程中没有基于 Spring MVC 框架构建的 Controller，那么可以按照如下方式添加一个 Controller；如果已经有 Controller，那么可直接访问相应的服务。
+
+```java
+package com.sofaboot.quickstart.controller;
+
+import com.sofaboot.quickstart.instance.OkhttpClientInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author: ljt
+ * @version: $Id: TracerOkhttpRestController.java, v 0.1 2024/05/27, ljt Exp $
+ */
+@RestController
+public class TracerOkhttpRestController {
+
+    /**
+     * 日志记录器对象
+     */
+    private static final Logger logger = LoggerFactory.getLogger(TracerOkhttpRestController.class);
+
+    private static final String TEMPLATE = "Hello, %s!";
+    private final AtomicLong counter = new AtomicLong();
+
+    /**
+     * Request http://localhost:8080/okhttp?name=
+     *
+     * @param name name
+     * @return Map of Result
+     */
+    @RequestMapping("/okhttp")
+    public Map<String, Object> okhttp(@RequestParam(value = "name", defaultValue = "okhttp") String name) {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("count", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+        return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/sync
+     *
+     * @return
+     * @throws Exception
+     */
+    @RequestMapping("/sync")
+    public String sync() throws Exception {
+        String httpGetUrl = "http://localhost:8080/okhttp";
+        String responseStr = new OkhttpClientInstance().executeGet(httpGetUrl);
+        logger.info("Response is {}", responseStr);
+
+        return responseStr;
+    }
+}
+```
+
+
+
+### 运行工程
+
+可以将 SOFABoot 工程导入到 IDE 中，工程编译正确后，运行工程里面中的 main 方法启动应用。以上面添加的 Controller 为例，可以
+
+通过在浏览器中输入 http://localhost:8080/sync 来访问 REST 服务，结果类似如下：
+
+```json
+{"success":true,"count":1,"content":"Hello, okhttp!"}
+```
+
+
+
+调用成功的控制台输出日志如下：
+
+```
+2024-05-27 00:00:00.000  INFO 22080 --- [nio-8080-exec-1] c.s.q.c.TracerOkhttpRestController       : Response is {"success":true,"count":1,"content":"Hello, okhttp!"}
+```
+
+
+
+在 SOFABoot 的配置文件 `application.properties` 中可定义日志打印目录。假设配置的日志打印目录是 `./logs`，即当前应用的根目录，应用名设置为 `spring.application.name=sofaboot-quickstart-tracer-okhttp`，那么在当前工程的根目录下可以看到类似如下结构的日志文件：
+
+```
+./logs
+├── spring.log
+└── tracelog
+    ├── okhttp-digest.log
+    ├── okhttp-stat.log
+    ├── spring-mvc-digest.log
+    ├── spring-mvc-stat.log
+    ├── static-info.log
+    └── tracer-self.log
+```
+
+
+
+#### 查看 OkHttp 摘要日志
+
+以 OkHttp 同步调用为例，摘要日志 `okhttp-digest.log` 如下：
+
+```json
+{"time":"2024-05-27 00:00:00.000","local.app":"sofaboot-quickstart-tracer-okhttp","traceId":"c0a818011716811868219100122080","spanId":"0.1","span.kind":"client","result.code":"200","current.thread.name":"http-nio-8080-exec-1","time.cost.milliseconds":"81ms","request.url":"http://localhost:8080/okhttp","method":"GET","result.code":"200","req.size.bytes":0,"resp.size.bytes":0,"remote.app":"","sys.baggage":"","biz.baggage":""}
+```
+
+对应 key 的说明如下：
+
+| key                    | 说明                    |
+| ---------------------- | ----------------------- |
+| time                   | 日志打印时间            |
+| local.app              | 当前应用名              |
+| traceId                | TraceId                 |
+| spanId                 | SpanId                  |
+| span.kind              | Span 类型               |
+| result.code            | 结果码                  |
+| current.thread.name    | 当前线程名              |
+| time.cost.milliseconds | 请求耗时                |
+| request.url            | 请求 URL                |
+| method                 | 调用方法                |
+| req.size.bytes         | 请求数据大小            |
+| resp.size.bytes        | 响应数据大小            |
+| remote.app             | 目标应用                |
+| sys.baggage            | 系统透传的 baggage 数据 |
+| biz.baggage            | 业务透传的 baggage 数据 |
+
+
+
+#### 查看 OkHttp 统计日志
+
+以 OkHttp 同步调用和异步调用为例，统计日志 `okhttp-stat.log` 如下：
+
+```json
+{"time":"2024-05-27 00:00:00.000","stat.key":{"method":"GET","local.app":"sofaboot-quickstart-tracer-okhttp","request.url":"http://localhost:8080/okhttp"},"count":1,"total.cost.milliseconds":81,"success":"Y","load.test":"F"}
 ```
 
 对应 key 的说明如下：
