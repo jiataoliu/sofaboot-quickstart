@@ -27,5 +27,6 @@
         <module>sofaboot-quickstart-tracer-datasource</module>
         <module>sofaboot-quickstart-tracer-resttemplate</module>
         <module>sofaboot-quickstart-tracer-okhttp</module>
+        <module>sofaboot-quickstart-tracer-slf4j</module>
     </modules>
 </project>
