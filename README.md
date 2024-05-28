@@ -2772,6 +2772,360 @@ public class TracerOkhttpRestController {
 
 
 
+## 集成 SLF4J MDC 功能
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.alipay.sofa</groupId>
+        <artifactId>sofaboot-dependencies</artifactId>
+        <version>3.11.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.sofaboot.quickstart</groupId>
+    <artifactId>sofaboot-quickstart-tracer-slf4j</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <name>sofaboot-quickstart-tracer-slf4j</name>
+    <description>sofaboot-quickstart-tracer-slf4j</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+
+
+### 引入 Tracer 依赖
+
+1. 在 SOFABoot 的 Web 项目中引入如下 Tracer 依赖：
+
+```xml
+<!-- import SOFABoot Dependency Tracer starter -->
+<dependency>
+    <groupId>com.alipay.sofa</groupId>
+    <artifactId>tracer-sofa-boot-starter</artifactId>
+</dependency>
+```
+
+添加 Tracer starter 依赖后，可在 SOFABoot 的全局配置文件中添加配置项目以定制 Tracer 的行为。详情见 [Tracer 配置项说明](https://help.aliyun.com/document_detail/151843.html?spm=a2c4g.280407.0.0.65896f45o7OjVg#h2-tracer-5)。
+
+
+
+2. slf4j 依赖
+
+```xml
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-logging</artifactId>
+</dependency>
+```
+
+
+
+### 添加 properties
+
+```properties
+# Application Name
+spring.application.name=sofaboot-quickstart-tracer-mvc-slf4j
+# 日志输出目录，默认输出到 ${user.home}
+logging.path=./logs
+
+# 参考文档：https://help.aliyun.com/document_detail/151854.html
+# 采样率 (0~100)%
+com.alipay.sofa.tracer.samplerPercentage=100
+# 采样模式类型名称
+#com.alipay.sofa.tracer.samplerName=PercentageBasedSampler
+
+# 统计日志的时间间隔，默认 60，这里为了方便快速看统计设置成 1
+com.alipay.sofa.tracer.statLogInterval=1
+com.alipay.sofa.tracer.zipkin.enabled=false
+
+# 是否以 JSON 格式输出日志，使用非 JSON 格式输出，期望较少日志空间占用
+#com.alipay.sofa.tracer.JSONOutput=false
+
+# 扩展的日志配置文件，扩展 xml 配置大于 yaml 配置
+logging.level.=info
+# 扩展的日志配置文件，扩展 xml 配置大于 yaml 配置
+logging.config=classpath:logback-spring-back.xml
+```
+
+
+
+### logback 示例
+
+1. 在 PatternLayout 中增加 `%X{SOFA-TraceId}` 和 `%X{SOFA-SpanId}` 配置：
+   - `%X{SOFA-TraceId}`：对应 `TraceId`，实际运行时将会被替换为当前 Tracer 上下文的 TraceId，如果当前不存在 Tracer 上下文，则会被替换为空字符串。
+   - `%X{SOFA-SpanId}`：对应 `SpanId`，实际运行时将会被替换为当前 Tracer 上下文的 SpanId，如果当前不存在 Tracer 上下文，则会被替换为空字符串。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- please pay attention that: file name should not be logback.xml，name it logback-spring.xml to use it in springboot framework -->
+<!-- 日志级别从低到高分为TRACE < DEBUG < INFO < WARN < ERROR < FATAL，如果设置为 WARN，则低于 WARN 的信息都不会输出 -->
+<!-- scan：当此属性设置为 true 时，配置文件如果发生改变，将会被重新加载，默认值为 true -->
+<!-- scanPeriod：设置监测配置文件是否有修改的时间间隔，如果没有给出时间单位，默认单位是毫秒。当 scan 为 true 时，此属性生效。默认的时间间隔为1分钟。 -->
+<!-- debug：当此属性设置为 true 时，将打印出 logback 内部日志信息，实时查看 logback 运行状态。默认值为 false。 -->
+<configuration scan="true" scanPeriod="10 seconds" debug="false">
+    <springProperty scope="context" name="logging.path" source="logging.path"/>
+    <springProperty scope="context" name="spring.application.name" source="spring.application.name"/>
+
+    <!-- Log formatted output -->
+    <property name="MDC_FILE_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z'} %-5level ${PID:-} [%thread] [%X{SOFA-TraceId},%X{SOFA-SpanId}] %logger{50} [%method,%line] - %msg%n"/>
+    <property name="MDC_CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z'} %highlight(%-5level) ${PID:-} [%magenta(%20.20thread)] [%X{SOFA-TraceId},%X{SOFA-SpanId}] %yellow(%logger{50}) [%cyan(%method,%line)] - %msg%n"/>
+
+    <!-- console output -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>${MDC_CONSOLE_PATTERN}</Pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- to generate logfile daily -->
+    <appender name="ERROR-APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <append>true</append>
+        <!-- a filter that show green light for object that has a error log level-->
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <!-- filter level -->
+            <level>ERROR</level>
+            <!-- match operation: ACCEPT -->
+            <onMatch>ACCEPT</onMatch>
+            <!-- mismatch operation: DENY -->
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <!-- log name -->
+        <file>${logging.path}/${spring.application.name}/common-error.log</file>
+        <!-- to generate a log file everyday with a longest lasting of 30 days -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- logfile name with daily rolling -->
+            <FileNamePattern>${logging.path}/${spring.application.name}/common-error.log.%d{yyyy-MM-dd}
+            </FileNamePattern>
+            <!-- limit the total size of your 30-day history to 3GB -->
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!-- output format：%d is for date，%thread is for thread name，%-5level：loglevel with 5 character  %msg：log message，%n line breaker -->
+            <pattern>${MDC_FILE_PATTERN}</pattern>
+            <!-- encoding -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="ROOT-APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <append>true</append>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <!-- filter level -->
+            <level>INFO</level>
+            <!-- match operation: ACCEPT -->
+            <onMatch>ACCEPT</onMatch>
+            <!-- mismatch operation: DENY -->
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <file>${logging.path}/${spring.application.name}/common-default.log</file>
+        <!-- to generate a log file everyday with a longest lasting of 30 days -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- logfile name with daily rolling-->
+            <FileNamePattern>${logging.path}/${spring.application.name}/common-default.log.%d{yyyy-MM-dd}
+            </FileNamePattern>
+            <!-- limit the total size of your 30-day history to 3GB -->
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!-- output format：%d is for date，%thread is for thread name，%-5level：loglevel with 5 character  %msg：log message，%n line breaker -->
+            <pattern>${MDC_FILE_PATTERN}</pattern>
+            <!-- encoding -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- SOFATracer MDC -->
+    <appender name="MDC-EXAMPLE-APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <append>true</append>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <!-- filter level -->
+            <level>INFO</level>
+        </filter>
+        <file>${logging.path}/${spring.application.name}/mdc-example.log</file>
+        <!-- to generate a log file everyday with a longest lasting of 30 days -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- logfile name with daily rolling-->
+            <FileNamePattern>${logging.path}/${spring.application.name}/mdc-example.log.%d{yyyy-MM-dd}</FileNamePattern>
+            <!-- limit the total size of your 30-day history to 3GB -->
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!-- output format：%d is for date，%thread is for thread name，%-5level：loglevel with 5 character  %msg：log message，%n line breaker -->
+            <pattern>${MDC_FILE_PATTERN}</pattern>
+            <!-- encoding -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 设置 Spring & Hibernate 日志输出级别 -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.mybatis" level="WARN"/>
+    <logger name="com.ibatis" level="DEBUG"/>
+    <logger name="com.ibatis.common.jdbc.SimpleDataSource" level="DEBUG"/>
+    <logger name="com.ibatis.common.jdbc.ScriptRunner" level="DEBUG"/>
+    <logger name="com.ibatis.sqlmap.engine.impl.SqlMapClientDelegate" level="DEBUG"/>
+    <logger name="java.sql.Connection" level="DEBUG"/>
+    <logger name="java.sql.Statement" level="DEBUG"/>
+    <logger name="java.sql.PreparedStatement" level="DEBUG"/>
+    <logger name="com.ruidou.baoqian.mapper" level="DEBUG"/>
+    <!-- TODO：name 改成自己的项目的包路径 -->
+    <logger name="com.sofaboot.quickstart.controller" level="DEBUG"/>
+
+    <logger name="com.sofaboot.quickstart" level="INFO" additivity="false">
+        <appender-ref ref="ROOT-APPENDER"/>
+        <appender-ref ref="ERROR-APPENDER"/>
+    </logger>
+
+    <logger name="MDC-EXAMPLE" level="INFO" additivity="false">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="MDC-EXAMPLE-APPENDER"/>
+        <appender-ref ref="ERROR-APPENDER"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="ROOT-APPENDER"/>
+        <appender-ref ref="ERROR-APPENDER"/>
+    </root>
+
+</configuration>
+```
+
+
+
+### 添加 Controller
+
+如果您的 Web 工程中没有基于 Spring MVC 框架构建的 Controller，那么可以按照如下方式添加一个 Controller；如果已经有 Controller，那么可直接访问相应的服务。
+
+```java
+package com.sofaboot.quickstart.controller;
+
+import com.alipay.common.tracer.core.async.SofaTracerRunnable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author: ljt
+ * @version: $Id: TracerSlf4jRestController.java, v 0.1 2024/05/28, ljt Exp $
+ */
+@RestController
+public class TracerSlf4jRestController {
+
+    /**
+     * 日志记录器对象
+     */
+    private static final Logger logger = LoggerFactory.getLogger("MDC-EXAMPLE");
+    // private static final Logger logger = LoggerFactory.getLogger(TracerSlf4jRestController.class);
+
+    private static final String TEMPLATE = "Hello, %s!";
+    private final AtomicLong counter = new AtomicLong();
+
+    /**
+     * Request http://localhost:8080/slf4j?name=slf4j
+     *
+     * @param name name
+     * @return Map of Result
+     */
+    @RequestMapping("/slf4j")
+    public Map<String, Object> slf4j(@RequestParam(value = "name", defaultValue = "SOFATracer SLF4J MDC EXAMPLE") String name) {
+        Map<String, Object> resultMap = new HashMap<String, Object>();
+        resultMap.put("success", true);
+        resultMap.put("count", counter.incrementAndGet());
+        resultMap.put("content", String.format(TEMPLATE, name));
+
+        long id = Thread.currentThread().getId();
+        logger.info("SOFATracer Print TraceId and SpanId ");
+
+        // Asynchronous thread transparent transmission
+        final SofaTracerRunnable sofaTracerRunnable = new SofaTracerRunnable(new Runnable() {
+            @Override
+            public void run() {
+                logger.info("SOFATracer Print TraceId and SpanId In Child Thread.");
+            }
+        });
+
+        Thread thread = new Thread(sofaTracerRunnable);
+        thread.start();
+
+        return resultMap;
+    }
+}
+```
+
+
+
+### 运行工程
+
+可以将 SOFABoot 工程导入到 IDE 中，工程编译正确后，运行工程里面中的 main 方法启动应用。以上面添加的 Controller 为例，可以
+
+通过在浏览器中输入 http://localhost:8080/slf4j 来访问 REST 服务，结果类似如下：
+
+```json
+{ "success": true, "count": 1, "content": "Hello, SOFATracer SLF4J MDC EXAMPLE!" }
+```
+
+
+
+调用成功的控制台输出日志如下：
+
+```
+2024-05-28T00:00:00.000Z INFO  17952 [http-nio-8080-exec-2] [c0a818011716916466413100117952,0] MDC-EXAMPLE [slf4j,44] - SOFATracer Print TraceId and SpanId 
+2024-05-28T00:00:00.000Z INFO  17952 [           Thread-12] [c0a818011716916466413100117952,0] MDC-EXAMPLE [run,50] - SOFATracer Print TraceId and SpanId In Child Thread.
+```
+
+
+
 # SOFABoot 安全兼容版本
 
 | **依赖**       | **包/组件名称**                | **3.6.6 版本** | **3.10.2 版本** |
