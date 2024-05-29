@@ -1,5 +1,6 @@
 package com.sofaboot.quickstart.controller;
 
+import com.alipay.common.tracer.core.async.SofaTracerCallable;
 import com.alipay.common.tracer.core.async.SofaTracerRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -55,5 +60,52 @@ public class TracerSlf4jRestController {
         thread.start();
 
         return resultMap;
+    }
+
+    /**
+     * Request http://localhost:8080/async
+     *
+     * @throws Exception
+     */
+    @RequestMapping("/async")
+    public void async() throws Exception {
+        logger.info("async start: SOFATracer Print TraceId and SpanId ");
+
+        // Async SofaTracerRunnable
+        final SofaTracerRunnable sofaTracerRunnable = new SofaTracerRunnable(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    // e.printStackTrace();
+                }
+                logger.info("SofaTracerRunnable: SOFATracer Print TraceId and SpanId In Child Thread.");
+            }
+        });
+        Thread thread = new Thread(sofaTracerRunnable);
+        thread.start();
+
+        // Async SofaTracerCallable
+        ExecutorService executor = Executors.newCachedThreadPool();
+        final SofaTracerCallable<Object> sofaTracerSpanSofaTracerCallable = new SofaTracerCallable<Object>(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException e) {
+                    // e.printStackTrace();
+                }
+                logger.info("SofaTracerCallable: SOFATracer Print TraceId and SpanId In Child Thread.");
+                return new Object();
+            }
+        });
+        Future<Object> futureResult = executor.submit(sofaTracerSpanSofaTracerCallable);
+        // do something in current thread
+        Thread.sleep(1000);
+        // another thread execute success and get result
+        Object objectReturn = futureResult.get();
+
+        logger.info("async end: SOFATracer Print TraceId and SpanId ");
     }
 }

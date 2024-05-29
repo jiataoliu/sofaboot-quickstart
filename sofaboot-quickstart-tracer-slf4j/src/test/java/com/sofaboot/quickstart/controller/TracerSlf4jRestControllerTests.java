@@ -37,4 +37,13 @@ public class TracerSlf4jRestControllerTests {
                 .andDo(MockMvcResultHandlers.print()) // 添加执行
                 .andReturn(); // 添加返回
     }
+
+    @Test
+    public void async() throws Exception {
+        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/async"))
+                .andExpect(MockMvcResultMatchers.status().isOk()) // 添加 status 断言
+                .andExpect(MockMvcResultMatchers.content().string("")) // 添加断言
+                .andDo(MockMvcResultHandlers.print()) // 添加执行
+                .andReturn(); // 添加返回
+    }
 }
